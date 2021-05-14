@@ -119,6 +119,7 @@ def mono_to_color(X, eps=1e-6, mean=None, std=None):
 
     return V
 
+print('test')
 
 class TrainDataset(Dataset):
     def __init__(self, df, transform=None, 
