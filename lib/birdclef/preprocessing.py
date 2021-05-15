@@ -27,10 +27,10 @@ class MelSpecComputer:
     def __call__(self, y):
         melspec = lb.feature.melspectrogram(
             y,
-            sr=self.sr,
-            n_mels=self.n_mels,
-            fmin=self.fmin,
-            fmax=self.fmax,
+            sr      = self.sr,
+            n_mels  = self.n_mels,
+            fmin    = self.fmin,
+            fmax    = self.fmax,
             **self.kwargs
         )
         melspec = lb.power_to_db(melspec).astype(np.float32)

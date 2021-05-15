@@ -3,8 +3,23 @@ import torch
 from torch import nn
 import timm
 from efficientnet_pytorch import EfficientNet
+from resnest.torch import resnest50
+
 from .constants import NUM_CLASSES, DEVICE
 
+def load_resnest50(checkpoint_path, num_classes=NUM_CLASSES):
+    net = resnest50(pretrained=False)
+    net.fc = nn.Linear(net.fc.in_features, num_classes)
+    dummy_device = torch.device("cpu")
+    d = torch.load(checkpoint_path, map_location=dummy_device)
+    for key in list(d.keys()):
+        d[key.replace("model.", "")] = d.pop(key)
+    net.load_state_dict(d)
+    net = net.to(DEVICE)
+    net = net.eval()
+    return net
+
+"""
 def load_resnest50(checkpoint_path, num_classes=NUM_CLASSES):
     net = timm.create_model("tf_efficientnet_b4", pretrained=False)
     net.classifier = nn.Linear(net.classifier.in_features, num_classes)
@@ -16,6 +31,7 @@ def load_resnest50(checkpoint_path, num_classes=NUM_CLASSES):
     net = net.to(DEVICE)
     net = net.eval()
     return net
+"""
 
 def load_effnetb3(checkpoint_path, num_classes=NUM_CLASSES):
     #cf. https://www.kaggle.com/andradaolteanu/ii-shopee-model-training-with-pytorch-x-rapids
