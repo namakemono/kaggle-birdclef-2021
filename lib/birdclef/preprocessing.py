@@ -13,13 +13,16 @@ class MelSpecComputer:
         sr:int,
         n_mels:int,
         fmin:int,
-        fmax:int
+        fmax:int,
+        **kwargs
     ):
         self.sr = sr
         self.n_mels = n_mels
         self.fmin = fmin
         self.fmax = fmax
-        self.n_fft = self.n_mels * 20
+        kwargs["n_fft"] = kwargs.get("n_fft", self.sr//10)
+        kwargs["hop_length"] = kwargs.get("hop_length", self.sr//(10*4))
+        self.kwargs = kwargs
 
     def __call__(self, y):
         melspec = lb.feature.melspectrogram(
@@ -27,13 +30,14 @@ class MelSpecComputer:
             sr=self.sr,
             n_mels=self.n_mels,
             fmin=self.fmin,
-            fmax=self.fmax
+            fmax=self.fmax,
+            **self.kwargs
         )
-
         melspec = lb.power_to_db(melspec).astype(np.float32)
         return melspec
 
 def mono_to_color(X, eps=1e-6, mean=None, std=None):
+    """モノクロをカラー画像に変換"""
     mean = mean or X.mean()
     std = std or X.std()
     X = (X - mean) / (std + eps)
@@ -44,7 +48,6 @@ def mono_to_color(X, eps=1e-6, mean=None, std=None):
         V = V.astype(np.uint8)
     else:
         V = np.zeros_like(X, dtype=np.uint8)
-
     return V
 
 def crop_or_pad(y, length, is_train=True, start=None):
