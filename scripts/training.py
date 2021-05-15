@@ -104,10 +104,10 @@ DURATION = 7
 MAX_READ_SAMPLES = 5 # Each record will have 10 melspecs at most, you can increase this on Colab with High Memory Enabled
 
 if "google.colab" in sys.modules:
-    DATA_ROOT = "/content" 
+    DATA_ROOT = "/content"
     MEL_PATHS = sorted(Path("/content").glob("kkiller-birdclef-mels-computer-d7-part?/rich_train_metadata.csv"))
     TRAIN_LABEL_PATHS = sorted(Path("/content").glob("kkiller-birdclef-mels-computer-d7-part?/LABEL_IDS.json"))
-else:  
+else:
     DATA_ROOT = Path("../input/birdclef-2021")
     MEL_PATHS = sorted(Path("../input").glob("kkiller-birdclef-mels-computer-d7-part?/rich_train_metadata.csv"))
     TRAIN_LABEL_PATHS = sorted(Path("../input").glob("kkiller-birdclef-mels-computer-d7-part?/LABEL_IDS.json"))
@@ -127,12 +127,12 @@ print("Device:", DEVICE)
 def get_df(mel_paths=MEL_PATHS, train_label_paths=TRAIN_LABEL_PATHS):
   df = None
   LABEL_IDS = {}
-    
+
   for file_path in mel_paths:
     temp = pd.read_csv(str(file_path), index_col=0)
-    temp["impath"] = temp.apply(lambda row: file_path.parent/"audio_images/{}/{}.npy".format(row.primary_label, row.filename), axis=1) 
+    temp["impath"] = temp.apply(lambda row: file_path.parent/"audio_images/{}/{}.npy".format(row.primary_label, row.filename), axis=1)
     df = temp if df is None else df.append(temp)
-    
+
   df["secondary_labels"] = df["secondary_labels"].apply(literal_eval)
 
   for file_path in train_label_paths:
@@ -152,7 +152,7 @@ df["label_id"].min(), df["label_id"].max()
 
 def get_model(name, num_classes=NUM_CLASSES):
     """
-    Loads a pretrained model. 
+    Loads a pretrained model.
     Supports ResNest, ResNext-wsl, EfficientNet, ResNext and ResNet.
 
     Arguments:
@@ -214,7 +214,7 @@ pd.Series([len(x) for x in audio_image_store.values()]).value_counts()
 class BirdClefDataset(Dataset):
 
     def __init__(self, audio_image_store, meta, sr=SR, is_train=True, num_classes=NUM_CLASSES, duration=DURATION):
-        
+
         self.audio_image_store = audio_image_store
         self.meta = meta.copy().reset_index(drop=True)
         self.sr = sr
@@ -222,7 +222,7 @@ class BirdClefDataset(Dataset):
         self.num_classes = num_classes
         self.duration = duration
         self.audio_length = self.duration*self.sr
-    
+
     @staticmethod
     def normalize(image):
         image = image.astype("float32", copy=False) / 255.0
@@ -231,18 +231,18 @@ class BirdClefDataset(Dataset):
 
     def __len__(self):
         return len(self.meta)
-    
+
     def __getitem__(self, idx):
         row = self.meta.iloc[idx]
         image = self.audio_image_store[row.filename]
 
         image = image[np.random.choice(len(image))]
         image = self.normalize(image)
-        
-        
+
+
         t = np.zeros(self.num_classes, dtype=np.float32) + 0.0025 # Label smoothing
         t[row.label_id] = 0.995
-        
+
         return image, t
 
 ds = BirdClefDataset(audio_image_store, meta=df, sr=SR, duration=DURATION, is_train=True)
@@ -262,7 +262,7 @@ def one_step( xb, yb, net, criterion, optimizer, scheduler=None):
   loss = criterion(o, yb)
   loss.backward()
   optimizer.step()
-  
+
   with torch.no_grad():
       l = loss.item()
 
@@ -301,7 +301,7 @@ def evaluate(net, criterion, val_laoder):
     o = torch.cat(os)
 
     l = criterion(o, y).item()
-    
+
     o = o.sigmoid()
     y = (y > 0.5)*1.0
 
@@ -320,7 +320,7 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder):
   l, lrap, prec, rec, f1, icount = 0.,0.,0.,0., 0., 0
   train_laoder = tqdm(train_laoder, leave = False)
   epoch_bar = train_laoder
-  
+
   for (xb, yb) in  epoch_bar:
       # epoch_bar.set_description("----|----|----|----|---->")
       _l, _lrap, _f1, _rec, _prec = one_step(xb, yb, net, criterion, optimizer)
@@ -331,7 +331,7 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder):
       prec += _prec
 
       icount += 1
-        
+
       if hasattr(epoch_bar, "set_postfix") and not icount%10:
           epoch_bar.set_postfix(
             loss="{:.6f}".format(l/icount),
@@ -340,7 +340,7 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder):
             rec="{:.3f}".format(rec/icount),
             f1="{:.3f}".format(f1/icount),
           )
-  
+
   scheduler.step()
 
   l /= icount
@@ -348,9 +348,9 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder):
   f1 /= icount
   rec /= icount
   prec /= icount
-  
+
   l_val, lrap_val, f1_val, rec_val, prec_val = evaluate(net, criterion, val_laoder)
-  
+
   return (l, l_val), (lrap, lrap_val), (f1, f1_val), (rec, rec_val), (prec, prec_val)
 
 class AutoSave:
@@ -388,7 +388,7 @@ class AutoSave:
     self.top_models.insert(rank+1, name)
     if len(self.top_models) > self.top_k:
       old_model = self.root.joinpath(self.top_models[0])
-      self.top_models.pop(0)      
+      self.top_models.pop(0)
 
     torch.save(model.state_dict(), path.as_posix())
 
@@ -405,7 +405,7 @@ class AutoSave:
       r += 1
 
     return r
-  
+
   def to_json(self):
     # t = time.strftime("%Y%m%d%H%M%S")
     name = "{}_logs".format(self.name)
@@ -504,19 +504,19 @@ def train(model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=None
 
   save_root = save_root or MODEL_ROOT/f"{model_name}{suffix}"
   save_root.mkdir(exist_ok=True, parents=True)
-  
+
   fold_bar = tqdm(df.reset_index().groupby("fold").index.apply(list).items(), total=df.fold.max()+1)
-  
+
   for fold, val_set in fold_bar:
       if folds and not fold in folds:
         continue
-      
+
       print(f"\n############################### [FOLD {fold}]")
       fold_bar.set_description(f"[FOLD {fold}]")
       train_set = np.setdiff1d(df.index, val_set)
-        
+
       one_fold(model_name, fold=fold, train_set=train_set , val_set=val_set , epochs=epochs, save=save, save_root=save_root)
-    
+
       gc.collect()
       torch.cuda.empty_cache()
 
