@@ -6,6 +6,7 @@ import librosa as lb
 import joblib
 import soundfile as sf
 
+# cf. https://github.com/ryanwongsa/kaggle-birdsong-recognition/blob/4ad1aa4ed99bc097289c7593c55bc09234e0fc59/src/config_params/configs.py
 class MelSpecComputer:
     def __init__(
         self,
@@ -18,6 +19,7 @@ class MelSpecComputer:
         self.n_mels = n_mels
         self.fmin = fmin
         self.fmax = fmax
+        self.n_fft = self.n_mels * 20
 
     def __call__(self, y):
         melspec = lb.feature.melspectrogram(
@@ -114,9 +116,13 @@ class AudioToImage:
         images = np.stack(images)
 
         if save:
-            path = f"{self.audio_image_directory}/{row['primary_label']}/{row['filename']}.npy"
+            path = os.path.join(
+                self.audio_image_directory,
+                row['primary_label'],
+                row['filename'].replace(".ogg", ".npy")
+            )
             os.makedirs(f"{self.audio_image_directory}/{row['primary_label']}", exist_ok=True)
-            np.save(str(path), images)
+            np.save(path, images)
         else:
             return  row.filename, images
 
