@@ -1,10 +1,30 @@
 import os
 import sys
+from typing import List
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 import soundfile as sf
 from .preprocessing import MelSpecComputer, mono_to_color
+
+def get_locations() -> List[dict]:
+    return [{
+        "site": "COL",
+        "latitude": 5.57,
+        "longitude": -75.85
+    }, {
+        "site": "COR",
+        "latitude": 10.12,
+        "longitude": -84.51
+    }, {
+        "site": "SNE",
+        "latitude": 38.49,
+        "longitude": -119.95
+    }, {
+        "site": "SSW",
+        "latitude": 42.47,
+        "longitude": -76.45
+    }]
 
 def get_root_directory() -> str:
     return "/content" if ("google.colab" in sys.modules) else "../input"
@@ -57,8 +77,7 @@ def load_test_data():
     )
     return df
 
-"""
-class BirdClefDataset(Dataset):
+class BirdClefTrainingDataset(Dataset):
     def __init__(
         self,
         audio_image_store,
@@ -96,7 +115,6 @@ class BirdClefDataset(Dataset):
         t[row.label_id] = 0.995
 
         return image, t
-"""
 
 class BirdCLEFDataset(Dataset):
     def __init__(

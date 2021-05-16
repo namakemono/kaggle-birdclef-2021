@@ -30,7 +30,7 @@ def get_entries() -> List[Entry]:
         ),
         Entry(
             id          = "resnext101_32x16d_wsl",
-            filepath    = Path("./resnext101_32x16d_wsl_sr32000_d7_v1_v1/birdclef_resnext101_32x16d_wsl_fold0_epoch_15_f1_val_07353_20210515161311.pth")
+            filepath    = Path("./resnext101_32x16d_wsl_sr32000_d7_v1_v1/birdclef_resnext101_32x16d_wsl_fold0_epoch_19_f1_val_07556_20210516052951.pth")
         )
     ]
 
