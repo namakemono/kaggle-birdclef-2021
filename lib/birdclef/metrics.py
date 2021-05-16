@@ -1,5 +1,3 @@
-
-
 def get_metrics(s_true, s_pred):
     s_true = set(s_true.split())
     s_pred = set(s_pred.split())

@@ -37,8 +37,10 @@ def get_model(name, num_classes=NUM_CLASSES, pretrained=True):
     Returns:
         torch model -- Pretrained model
     """
-    if "resnest" in name:
+    if name == "resnest50":
         model = resnest50(pretrained=pretrained)
+    elif name == "resnest50d_1s4x24d":
+        model = timm.models.resnest50d_1s4x24d(pretrained=pretrained)
     elif "wsl" in name:
         model = torch.hub.load("facebookresearch/WSL-Images", name)
     elif name.startswith("resnext") or  name.startswith("resnet"):

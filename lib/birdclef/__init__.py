@@ -6,6 +6,7 @@ from . import datasets
 from . import feature_extraction
 from . import preprocessing
 from . import models
+from . import optimization
 from . import training
 
 
