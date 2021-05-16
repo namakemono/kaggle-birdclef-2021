@@ -2,79 +2,18 @@ from pathlib import Path
 import torch
 from torch import nn
 import timm
-from efficientnet_pytorch import EfficientNet
 from resnest.torch import resnest50
+from efficientnet_pytorch import EfficientNet
+import pretrainedmodels
 
 from .constants import NUM_CLASSES, DEVICE
 
-def load_resnest50(checkpoint_path, num_classes=NUM_CLASSES):
-    net = resnest50(pretrained=False)
-    net.fc = nn.Linear(net.fc.in_features, num_classes)
-    dummy_device = torch.device("cpu")
-    d = torch.load(checkpoint_path, map_location=dummy_device)
-    for key in list(d.keys()):
-        d[key.replace("model.", "")] = d.pop(key)
-    net.load_state_dict(d)
-    net = net.to(DEVICE)
-    net = net.eval()
-    return net
-
-"""
-def load_resnest50(checkpoint_path, num_classes=NUM_CLASSES):
-    net = timm.create_model("tf_efficientnet_b4", pretrained=False)
-    net.classifier = nn.Linear(net.classifier.in_features, num_classes)
-    dummy_device = torch.device("cpu")
-    d = torch.load(checkpoint_path, map_location=dummy_device)
-    for key in list(d.keys()):
-        d[key.replace("model.", "")] = d.pop(key)
-    net.load_state_dict(d)
-    net = net.to(DEVICE)
-    net = net.eval()
-    return net
-"""
-
-def load_effnetb3(checkpoint_path, num_classes=NUM_CLASSES):
-    #cf. https://www.kaggle.com/andradaolteanu/ii-shopee-model-training-with-pytorch-x-rapids
-    net = EfficientNet.from_name("efficientnet-b3").cuda()
-    if hasattr(net, "fc"):
-        nb_ft = net.fc.in_features
-        net.fc = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "_fc"):
-        nb_ft = net._fc.in_features
-        net._fc = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "classifier"):
-        nb_ft = net.classifier.in_features
-        net.classifier = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "last_linear"):
-        nb_ft = net.last_linear.in_features
-        net.last_linear = nn.Linear(nb_ft, num_classes)
-    dummy_device = torch.device("cpu")
-    d = torch.load(checkpoint_path, map_location=dummy_device)
-    for key in list(d.keys()):
-        d[key.replace("model.", "")] = d.pop(key)
-    net.load_state_dict(d)
-    net = net.to(DEVICE)
-    net = net.eval()
-    return net
-
-def load_wsl(
+def load_model(
     name:str,
     checkpoint_path:Path,
     num_classes=NUM_CLASSES
 ):
-    net = torch.hub.load("facebookresearch/WSL-Images", name)
-    if hasattr(net, "fc"):
-        nb_ft = net.fc.in_features
-        net.fc = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "_fc"):
-        nb_ft = net._fc.in_features
-        net._fc = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "classifier"):
-        nb_ft = net.classifier.in_features
-        net.classifier = nn.Linear(nb_ft, num_classes)
-    elif hasattr(net, "last_linear"):
-        nb_ft = net.last_linear.in_features
-        net.last_linear = nn.Linear(nb_ft, num_classes)
+    net = get_model(name, num_classes, pretrained=False)
     dummy_device = torch.device("cpu")
     d = torch.load(checkpoint_path, map_location=dummy_device)
     for key in list(d.keys()):
@@ -84,7 +23,7 @@ def load_wsl(
     net = net.eval()
     return net
 
-def get_model(name, num_classes=NUM_CLASSES):
+def get_model(name, num_classes=NUM_CLASSES, pretrained=True):
     """
     Loads a pretrained model.
     Supports ResNest, ResNext-wsl, EfficientNet, ResNext and ResNet.
@@ -99,13 +38,15 @@ def get_model(name, num_classes=NUM_CLASSES):
         torch model -- Pretrained model
     """
     if "resnest" in name:
-        model = getattr(resnest_torch, name)(pretrained=True)
+        model = resnest50(pretrained=pretrained)
     elif "wsl" in name:
         model = torch.hub.load("facebookresearch/WSL-Images", name)
     elif name.startswith("resnext") or  name.startswith("resnet"):
-        model = torch.hub.load("pytorch/vision:v0.6.0", name, pretrained=True)
+        model = torch.hub.load("pytorch/vision:v0.6.0", name, pretrained=pretrained)
     elif name.startswith("tf_efficientnet_b"):
-        model = getattr(timm.models.efficientnet, name)(pretrained=False)
+        model = getattr(timm.models.efficientnet, name)(pretrained=pretrained)
+    elif name.startswith("densenet"):
+        model = getattr(timm.models.densenet, name)(pretrained=pretrained)
     elif "efficientnet-b" in name:
         model = EfficientNet.from_pretrained(name)
     else:

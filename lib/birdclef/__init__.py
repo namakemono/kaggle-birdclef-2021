@@ -1,5 +1,6 @@
 from . import utils
 from . import metrics
+from . import callbacks
 from . import registry
 from . import datasets
 from . import preprocessing

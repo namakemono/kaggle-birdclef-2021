@@ -62,7 +62,7 @@ class BirdClefDataset(Dataset):
     def __init__(
         self,
         audio_image_store,
-        meta,
+        meta:pd.DataFrame,
         sr:int,
         is_train:bool,
         num_classes:int,
@@ -102,7 +102,7 @@ class BirdCLEFDataset(Dataset):
     def __init__(
         self,
         data,
-        sr:int          = 32000,
+        sr:int          = 32000,            # サンプリングレート
         n_mels:int      = 128,              # メルフィルタバンク
         fmin:int        = 0,
         fmax:int        = None,
