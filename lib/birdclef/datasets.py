@@ -190,14 +190,3 @@ class BirdCLEFDataset(Dataset):
 
 
 
-
-
-
-
-
-
-
-
-
-
-

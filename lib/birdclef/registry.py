@@ -18,7 +18,7 @@ def get_entries() -> List[Entry]:
         ),
         Entry(
             id          = "resnest50d_1s4x24d",
-            filepath    = Path("./resnest50d_1s4x24d_sr32000_d7_densenet161_nmels-128_sites-col_lr-001/birdclef_resnest50d_1s4x24d_fold0_epoch_21_f1_val_06844_20210516093923.pth")
+            filepath    = Path("./resnest50d_1s4x24d_sr32000_d7_densenet161_nmels-128_sites-col_lr-001/birdclef_resnest50d_1s4x24d_fold0_epoch_29_f1_val_07023_20210516100947.pth")
         ),
         Entry(
             id          = "densenet121",
