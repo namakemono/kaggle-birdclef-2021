@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 import xgboost as xgb
+from . import metrics
 from . import datasets
 from . import feature_extraction
 
@@ -42,70 +43,37 @@ def train(
                 (X_train, y_train),
                 (X_valid, y_valid)
             ],
-            eval_metric = "logloss",
-            verbose = 10,
-            early_stopping_rounds = 20,
-            sample_weight = sample_weight,
-            sample_weight_eval_set = sample_weight_eval_set,
+            eval_metric             = "logloss",
+            verbose                 = 10,
+            early_stopping_rounds   = 20,
+            sample_weight           = sample_weight,
+            sample_weight_eval_set  = sample_weight_eval_set,
         )
         oof[valid_index] = clf.predict(X_valid)
 
     from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
     print("Call or No call classirication")
     print("candiates: %d" % num_candidates)
-    print("F1: %.4f" % f1_score(y, oof))
+    print("binary F1: %.4f" % f1_score(y, oof))
     print("gt positive ratio: %.4f" % np.mean(y))
     print("oof positive ratio: %.4f" % np.mean(oof))
     print("Accuracy: %.4f" % accuracy_score(y, oof))
     print("Recall: %.4f" % recall_score(y, oof))
     print("Precision: %.4f" % precision_score(y, oof))
 
-    _df = candidate_df[oof == 1]
-    _gdf = _df.groupby(["audio_id", "seconds"], as_index=False)["label"].apply(lambda _: " ".join(_))
-    df2 = pd.merge(df[["audio_id", "seconds", "birds"]], _gdf, how="left", on=["audio_id", "seconds"])
+    _gdf = candidate_df[oof == 1].groupby(
+        ["audio_id", "seconds"],
+        as_index=False
+    )["label"].apply(lambda _: " ".join(_))
+    df2 = pd.merge(
+        df[["audio_id", "seconds", "birds"]],
+        _gdf,
+        how="left",
+        on=["audio_id", "seconds"]
+    )
     df2.loc[df2["label"].isnull(), "label"] = "nocall"
-    print("F1: %.4f" % df2.apply(to_f1_score, axis=1).mean())
-
-def to_f1_score(row):
-    S = set(row["birds"].split())
-    T = set(row["label"].split())
-    return len(S & T) / len(S | T)
-
-def calc_baseline(df, num_spieces):
-    """単純に閾値だけでのF1スコアの最適値を算出"""
-    columns = datasets.get_bird_columns()
-    label_to_index = {label:index for index, label in enumerate(datasets.get_bird_columns())}
-    label_to_index["nocall"] = -1
-    index_to_label = {v:k for k, v in label_to_index.items()}
-
-    X = df[columns].values
-    def f(th):
-        n = X.shape[0]
-        pred_labels = [[] for i in range(n)]
-        I, J = np.where(X > th)
-        for i, j in zip(I, J):
-            pred_labels[i].append(index_to_label[j])
-        scores = []
-        for i in range(n):
-            if len(pred_labels[i]) == 0:
-                S = set(["nocall"])
-            else:
-                S = set(pred_labels[i])
-            T = set(df.iloc[i]["birds"].split())
-            scores.append(len(S & T) / len(S | T))
-        return np.mean(scores)
-
-    lb, ub = 0, 1
-    for k in range(30):
-        th1 = (2*lb + ub) / 3
-        th2 = (lb + 2*ub) / 3
-        if f(th1) < f(th2):
-            lb = th1
-        else:
-            ub = th2
-    th = (lb + ub) / 2
-    print("best th: %.4f" % th)
-    print("best F1: %.4f" % f(th))
-    return th
-
+    print("CV F1: %.4f" % df2.apply(
+        lambda _: metrics.f1_score(_["birds"], _["label"]),
+        axis=1
+    ).mean())
 
