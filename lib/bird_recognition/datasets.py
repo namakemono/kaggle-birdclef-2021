@@ -1,5 +1,33 @@
+import pandas as pd
+
+def load_metadata() -> pd.DataFrame:
+    meta_df = pd.read_csv("../input/birdclef-2021/train_metadata.csv")
+    meta_df["id"] = meta_df.index + 1
+    meta_df["year"] = meta_df["date"].apply(lambda _: _.split("-")[0]).astype(int)
+    meta_df["month"] = meta_df["date"].apply(lambda _: _.split("-")[1]).astype(int)
+    return meta_df
+
+def get_locations():
+    return [{
+        "site": "COL",
+        "latitude": 5.57,
+        "longitude": -75.85
+    }, {
+        "site": "COR",
+        "latitude": 10.12,
+        "longitude": -84.51
+    }, {
+        "site": "SNE",
+        "latitude": 38.49,
+        "longitude": -119.95
+    }, {
+        "site": "SSW",
+        "latitude": 42.47,
+        "longitude": -76.45
+    }]
+
 def get_bird_label_to_index():
-    label_to_index = {label:index for index, label in enumerate(datasets.get_bird_columns())}
+    label_to_index = {label:index for index, label in enumerate(get_bird_columns())}
     label_to_index["nocall"] = -1
     return label_to_index
 
@@ -13,7 +41,7 @@ def get_num_spieces():
 
 def get_bird_columns():
     return [
-        'acafly',
+         'acafly',
          'acowoo',
          'aldfly',
          'ameavo',
