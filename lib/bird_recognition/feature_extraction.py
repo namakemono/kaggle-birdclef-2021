@@ -34,8 +34,10 @@ def add_features(
 ) -> pd.DataFrame:
     meta_df = datasets.load_metadata()
     # 緯度経度
-    candidate_df["latitude"] = candidate_df["site"].apply(to_latitude)
-    candidate_df["longitude"] = candidate_df["site"].apply(to_longitude)
+    if not "latitude" in candidate_df.columns:
+        candidate_df["latitude"] = candidate_df["site"].apply(to_latitude)
+    if not "longitude" in candidate_df.columns:
+        candidate_df["longitude"] = candidate_df["site"].apply(to_longitude)
     # 出現回数
     candidate_df["num_appear"] = candidate_df["label"].map(
         meta_df["primary_label"].value_counts()
