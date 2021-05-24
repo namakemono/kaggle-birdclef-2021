@@ -21,7 +21,7 @@ def calc_baseline(prob_df:pd.DataFrame):
                 pred_labels[i] = " ".join(pred_labels[i])
         prob_df["pred_labels"] = pred_labels
         return prob_df.apply(
-            lambda _: metrics.f1_score(_["birds"], _["pred_labels"]),
+            lambda _: metrics.get_metrics(_["birds"], _["pred_labels"])["f1"],
             axis=1
         ).mean()
 

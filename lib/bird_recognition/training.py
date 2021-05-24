@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
 import xgboost as xgb
+import pickle
 from . import metrics
 from . import datasets
 from . import feature_extraction
@@ -51,6 +52,7 @@ def train(
             sample_weight           = sample_weight,
             sample_weight_eval_set  = sample_weight_eval_set,
         )
+        pickle.dump(clf, open(f"xgb_{kfold_index}.pkl", "wb"))
         oofa[valid_index] = clf.predict_proba(X_valid)[:,1]
 
     def f(th):
@@ -66,7 +68,7 @@ def train(
         )
         df2.loc[df2["label"].isnull(), "label"] = "nocall"
         return df2.apply(
-            lambda _: metrics.f1_score(_["birds"], _["label"]),
+            lambda _: metrics.get_metrics(_["birds"], _["label"])["f1"],
             axis=1
         ).mean()
 
@@ -90,9 +92,5 @@ def train(
         print("Accuracy: %.4f" % accuracy_score(y, oof))
         print("Recall: %.4f" % recall_score(y, oof))
         print("Precision: %.4f" % precision_score(y, oof))
-
-
-
-
 
 
