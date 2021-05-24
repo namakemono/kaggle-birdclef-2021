@@ -1,8 +1,6 @@
 from typing import List
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedGroupKFold
-import xgboost as xgb
 from . import datasets
 
 def to_site(row, max_distance:int):

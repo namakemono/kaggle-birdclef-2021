@@ -1,8 +1,6 @@
 from typing import List
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedGroupKFold
-import xgboost as xgb
 from . import datasets
 from . import feature_extraction
 
@@ -40,6 +38,7 @@ def make_candidates(prob_df:pd.DataFrame, num_spieces:int, num_candidates:int):
             next_row = prob_df.iloc[i+1]
         for prob, bird_id, label in zip(probs, bird_ids, labels):
             record = {
+                "row_id": row["row_id"], # row_id := audio_id + "_" + seconds
                 "site": row["site"],
                 "year": row["year"],
                 "month": row["month"],
