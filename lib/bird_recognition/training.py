@@ -14,8 +14,14 @@ def train(
     df:pd.DataFrame,
     num_kfolds:int,
     weight_rate:float=2.5,
+    xgb_params:dict=None,
     verbose:bool=False
 ):
+    if xgb_params is None:
+        xgb_params = {
+            "objective": "binary:logistic",
+            "tree_method": 'gpu_hist'
+        }
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
@@ -37,9 +43,7 @@ def train(
         sample_weight_val = np.ones(y_valid.shape)
         sample_weight_val[y_valid==1] = weight_rate
         sample_weight_eval_set = [sample_weight, sample_weight_val]
-        clf = xgb.XGBClassifier(
-            objective = "binary:logistic",
-        )
+        clf = xgb.XGBClassifier(**xgb_params)
         clf.fit(
             X_train, y_train,
             eval_set = [
