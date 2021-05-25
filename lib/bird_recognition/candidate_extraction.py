@@ -4,7 +4,12 @@ import pandas as pd
 from . import datasets
 from . import feature_extraction
 
-def make_candidates(prob_df:pd.DataFrame, num_spieces:int, num_candidates:int):
+def make_candidates(
+    prob_df:pd.DataFrame,
+    num_spieces:int,
+    num_candidates:int,
+    max_distance:int
+):
     """
     Parameters
     ----------
@@ -21,7 +26,7 @@ def make_candidates(prob_df:pd.DataFrame, num_spieces:int, num_candidates:int):
         prob_df["year"] = prob_df["date"].apply(lambda _: int(_.split("-")[0]))
         prob_df["month"] = prob_df["date"].apply(lambda _: int(_.split("-")[1]))
         prob_df["site"] = prob_df.apply(
-            lambda row: feature_extraction.to_site(row, config.max_distance),
+            lambda row: feature_extraction.to_site(row, max_distance),
             axis=1
         )
     else:

@@ -13,6 +13,7 @@ def train(
     candidate_df:pd.DataFrame,
     df:pd.DataFrame,
     num_kfolds:int,
+    weight_rate:float=2.5,
     verbose:bool=False
 ):
     feature_names = feature_extraction.get_feature_names()
@@ -31,7 +32,6 @@ def train(
         X_train, y_train = X[train_index], y[train_index]
         X_valid, y_valid = X[valid_index], y[valid_index]
         # 正例の重みを weight_rate, 負例を1にする
-        weight_rate = 2.5
         sample_weight = np.ones(y_train.shape)
         sample_weight[y_train==1] = weight_rate
         sample_weight_val = np.ones(y_valid.shape)
