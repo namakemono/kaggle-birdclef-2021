@@ -19,8 +19,8 @@ def train(
 ):
     if xgb_params is None:
         xgb_params = {
-            objective: "binary:logistic",
-            tree_method: 'gpu_hist'
+            "objective": "binary:logistic",
+            "tree_method": 'gpu_hist'
         }
     feature_names = feature_extraction.get_feature_names()
     if verbose:
