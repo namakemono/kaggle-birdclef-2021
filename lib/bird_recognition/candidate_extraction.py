@@ -8,7 +8,8 @@ def make_candidates(
     prob_df:pd.DataFrame,
     num_spieces:int,
     num_candidates:int,
-    max_distance:int
+    max_distance:int,
+    num_prob:int=3, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
 ):
     if "author" in prob_df.columns: # メタデータ(図鑑/short audio)
         prob_df["audio_id"] = prob_df["filename"].apply(
@@ -31,7 +32,7 @@ def make_candidates(
         prob_df["longitude"] = prob_df["site"].apply(feature_extraction.to_longitude)
     label_to_index = datasets.get_bird_label_to_index()
     index_to_label = datasets.get_bird_index_to_label()
-    prob_num = 3
+    num_prob = 3
     bird_columns = datasets.get_bird_columns()
     X = prob_df[bird_columns].values
     bird_ids_list = np.argsort(-X)[:,:num_candidates]
@@ -48,7 +49,7 @@ def make_candidates(
         "prob": probs_list.flatten(),
     }
     audio_ids = prob_df["audio_id"].values[rows]
-    for diff in range(-prob_num, prob_num+1):
+    for diff in range(-num_prob, num_prob+1):
         if diff == 0:
             continue
         neighbor_audio_ids = prob_df["audio_id"].shift(diff).values[rows]
