@@ -9,7 +9,7 @@ def make_candidates(
     num_spieces:int,
     num_candidates:int,
     max_distance:int,
-    num_prob:int=3, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
+    num_prob:int=6, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
 ):
     if "author" in prob_df.columns: # メタデータ(図鑑/short audio)
         prob_df["audio_id"] = prob_df["filename"].apply(
