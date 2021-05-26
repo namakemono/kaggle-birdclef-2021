@@ -40,8 +40,10 @@ def make_candidates(
     n = len(prob_df)
     X = prob_df[datasets.get_bird_columns()].values
     scores = []
-    prev_row = None
-    next_row = None
+
+    prob_num = 3
+    prev_rows = [None for i in range(prob_num)]
+    next_rows = [None for i in range(prob_num)]
     for i in range(n):
         row = prob_df.iloc[i]
         S = set(row["birds"].split())
@@ -52,11 +54,12 @@ def make_candidates(
             T = set(["nocall"] + labels)
             score = len(S&T) / len(S)
             scores.append(score)
-        if i > 0:
-            prev_row = prob_df.iloc[i-1]
-        if i+1 < n:
-            next_row = prob_df.iloc[i+1]
-        for prob, bird_id, label in zip(probs, bird_ids, labels):
+        for diff in range(prob_num):
+            if i > diff:
+                prev_rows[diff] = prob_df.iloc[i-1-diff]
+            if i+1+diff < n:
+                next_rows[diff] = prob_df.iloc[i+1+diff]
+        for rank, (prob, bird_id, label) in enumerate(zip(probs, bird_ids, labels)):
             record = {
                 "row_id": row["row_id"], # row_id := audio_id + "_" + seconds
                 "site": row["site"],
@@ -65,16 +68,24 @@ def make_candidates(
                 "prob": prob,
                 "bird_id": bird_id,
                 "label": label,
+                "rank": rank,
                 "audio_id": row["audio_id"],
                 "seconds": row["seconds"],
                 "target": int(label in S)
             }
-            if prev_row is not None:
-                if prev_row["audio_id"] == row["audio_id"]:
-                    record["prev_prob"] = prev_row[label]
-            if next_row is not None:
-                if next_row["audio_id"] == row["audio_id"]:
-                    record["next_prob"] = next_row[label]
+            for diff in range(prob_num):
+                if prev_rows[diff] is not None:
+                    if prev_rows[diff]["audio_id"] == row["audio_id"]:
+                        if diff==0:
+                            record[f"prev_prob"] = prev_rows[diff][label]
+                        else:
+                            record[f"prev{diff+1}_prob"] = prev_rows[diff][label]
+                if next_rows[diff] is not None:
+                    if next_rows[diff]["audio_id"] == row["audio_id"]:
+                        if diff==0:
+                            record[f"next_prob"] = next_rows[diff][label]
+                        else:
+                            record[f"next{diff+1}_prob"] = next_rows[diff][label]
             records.append(record)
     candidate_df = pd.DataFrame(records)
     print("候補数: %d, 網羅率: %.4f" % (num_candidates, np.mean(scores)))
