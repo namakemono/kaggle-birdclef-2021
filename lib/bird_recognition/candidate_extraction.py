@@ -32,7 +32,6 @@ def make_candidates(
         prob_df["longitude"] = prob_df["site"].apply(feature_extraction.to_longitude)
     label_to_index = datasets.get_bird_label_to_index()
     index_to_label = datasets.get_bird_index_to_label()
-    num_prob = 3
     bird_columns = datasets.get_bird_columns()
     X = prob_df[bird_columns].values
     bird_ids_list = np.argsort(-X)[:,:num_candidates]
