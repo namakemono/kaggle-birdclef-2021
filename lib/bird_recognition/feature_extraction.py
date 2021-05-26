@@ -149,6 +149,11 @@ def get_feature_names() -> List[str]:
         "month",
         "sum_prob",
         "mean_prob",
+        #"std_prob", 逆効果
+        "max_prob",
+        "min_prob",
+        #"skew_prob",
+        #"kurt_prob",
         "prev3_prob",
         "prev2_prob",
         "prev_prob",
