@@ -93,7 +93,7 @@ def add_features(
     candidate_df["prob - prob_max_in_same_audio"] = candidate_df["prob"] - candidate_df["prob_max_in_same_audio"]
 
     # 前後フレームの平均
-    
+
     return candidate_df
 
 def to_zscore(row):
@@ -147,7 +147,7 @@ def get_feature_names() -> List[str]:
     return [
         "year",
         "month",
-        "prev3_prob", 
+        "prev3_prob",
         "prev2_prob",
         "prev_prob",
         "prob",
