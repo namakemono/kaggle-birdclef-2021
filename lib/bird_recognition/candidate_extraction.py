@@ -38,9 +38,12 @@ def make_candidates(
     row_ids = prob_df["row_id"].tolist()
     rows = [i//num_candidates for i in range(len(bird_ids_list.flatten()))]
     cols = bird_ids_list.flatten()
+    # 何番目の候補か
+    ranks = [i%num_candidates for i in range(len(rows))]
     probs_list = X[rows, cols]
     D = {
         "row_id": [row_ids[i] for i in rows],
+        "ranks": ranks,
         "bird_id": bird_ids_list.flatten(),
         "prob": probs_list.flatten(),
     }
@@ -72,7 +75,6 @@ def make_candidates(
         how="left",
         on="row_id"
     )
-    candidate_df["rank"] = candidate_df["seconds"] // 5
     candidate_df["target"] = candidate_df.apply(
         lambda row: index_to_label[row["bird_id"]] in set(row["birds"].split()),
         axis=1
