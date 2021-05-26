@@ -147,6 +147,8 @@ def get_feature_names() -> List[str]:
     return [
         "year",
         "month",
+        "sum_prob",
+        "mean_prob",
         "prev3_prob",
         "prev2_prob",
         "prev_prob",

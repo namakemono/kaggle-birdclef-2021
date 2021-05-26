@@ -30,6 +30,10 @@ def make_candidates(
         prob_df["month"] = prob_df["date"].apply(lambda _: int(str(_)[4:6]))
         prob_df["latitude"] = prob_df["site"].apply(feature_extraction.to_latitude)
         prob_df["longitude"] = prob_df["site"].apply(feature_extraction.to_longitude)
+    
+    sum_prob_list = prob_df[datasets.get_bird_columns()].sum(axis=1).tolist()
+    mean_prob_list = prob_df[datasets.get_bird_columns()].mean(axis=1).tolist()
+    
     label_to_index = datasets.get_bird_label_to_index()
     index_to_label = datasets.get_bird_index_to_label()
     bird_columns = datasets.get_bird_columns()
@@ -46,6 +50,8 @@ def make_candidates(
         "rank": ranks,
         "bird_id": bird_ids_list.flatten(),
         "prob": probs_list.flatten(),
+        "sum_prob": [sum_prob_list[i//num_candidates] for i in range(num_candidates*len(mean_prob_list))],
+        "mean_prob": [mean_prob_list[i//num_candidates] for i in range(num_candidates*len(mean_prob_list))],
     }
     audio_ids = prob_df["audio_id"].values[rows]
     for diff in range(-num_prob, num_prob+1):
