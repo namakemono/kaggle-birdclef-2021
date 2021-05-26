@@ -59,7 +59,7 @@ def make_candidates(
                 prev_rows[diff] = prob_df.iloc[i-1-diff]
             if i+1+diff < n:
                 next_rows[diff] = prob_df.iloc[i+1+diff]
-        for prob, bird_id, label in zip(probs, bird_ids, labels):
+        for rank, (prob, bird_id, label) in enumerate(zip(probs, bird_ids, labels)):
             record = {
                 "row_id": row["row_id"], # row_id := audio_id + "_" + seconds
                 "site": row["site"],
@@ -68,6 +68,7 @@ def make_candidates(
                 "prob": prob,
                 "bird_id": bird_id,
                 "label": label,
+                "rank": rank,
                 "audio_id": row["audio_id"],
                 "seconds": row["seconds"],
                 "target": int(label in S)

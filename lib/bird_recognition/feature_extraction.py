@@ -154,6 +154,7 @@ def get_feature_names() -> List[str]:
         "next_prob",
         "next2_prob",
         "next3_prob",
+        "rank",
         "latitude",
         "longitude",
         "bird_id", # 📈, +0.013700
