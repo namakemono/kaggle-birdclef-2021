@@ -9,7 +9,7 @@ def make_candidates(
     num_spieces:int,
     num_candidates:int,
     max_distance:int,
-    num_prob:int=3, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
+    num_prob:int=6, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
 ):
     if "author" in prob_df.columns: # メタデータ(図鑑/short audio)
         prob_df["audio_id"] = prob_df["filename"].apply(
@@ -33,6 +33,11 @@ def make_candidates(
     
     sum_prob_list = prob_df[datasets.get_bird_columns()].sum(axis=1).tolist()
     mean_prob_list = prob_df[datasets.get_bird_columns()].mean(axis=1).tolist()
+    std_prob_list = prob_df[datasets.get_bird_columns()].std(axis=1).tolist()
+    max_prob_list = prob_df[datasets.get_bird_columns()].max(axis=1).tolist()
+    min_prob_list = prob_df[datasets.get_bird_columns()].min(axis=1).tolist()
+    skew_prob_list = prob_df[datasets.get_bird_columns()].skew(axis=1).tolist()
+    kurt_prob_list = prob_df[datasets.get_bird_columns()].kurt(axis=1).tolist()
     
     label_to_index = datasets.get_bird_label_to_index()
     index_to_label = datasets.get_bird_index_to_label()
@@ -52,6 +57,11 @@ def make_candidates(
         "prob": probs_list.flatten(),
         "sum_prob": [sum_prob_list[i//num_candidates] for i in range(num_candidates*len(mean_prob_list))],
         "mean_prob": [mean_prob_list[i//num_candidates] for i in range(num_candidates*len(mean_prob_list))],
+        "std_prob": [std_prob_list[i//num_candidates] for i in range(num_candidates*len(std_prob_list))],
+        "max_prob": [max_prob_list[i//num_candidates] for i in range(num_candidates*len(max_prob_list))],
+        "min_prob": [min_prob_list[i//num_candidates] for i in range(num_candidates*len(min_prob_list))],
+        "skew_prob": [skew_prob_list[i//num_candidates] for i in range(num_candidates*len(skew_prob_list))],
+        "kurt_prob": [kurt_prob_list[i//num_candidates] for i in range(num_candidates*len(kurt_prob_list))],
     }
     audio_ids = prob_df["audio_id"].values[rows]
     for diff in range(-num_prob, num_prob+1):
