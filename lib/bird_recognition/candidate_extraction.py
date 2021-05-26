@@ -43,7 +43,7 @@ def make_candidates(
     probs_list = X[rows, cols]
     D = {
         "row_id": [row_ids[i] for i in rows],
-        "ranks": ranks,
+        "rank": ranks,
         "bird_id": bird_ids_list.flatten(),
         "prob": probs_list.flatten(),
     }
