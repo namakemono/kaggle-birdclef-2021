@@ -304,6 +304,7 @@ def run(training_config, config, prob_df, model_dict):
         max_distance=training_config.max_distance
     )
     for mode in model_dict.keys():
+        print(f'training of {mode} is going...')
         bird_recognition.training.train(
             candidate_df,
             prob_df,
