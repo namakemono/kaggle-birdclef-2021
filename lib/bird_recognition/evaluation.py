@@ -230,7 +230,8 @@ def optimize(
         else:
             ub = th2
     th = (lb + ub) / 2
-    print("best threshold: %f" % th)
+    print("## 下記の閾値をメモして，動作確認時にモデル動作確認用のF1値と一致していることを確認")
+    print("📌best threshold: %f" % th)
     print("best F1: %f" % f(th))
     return th
 
