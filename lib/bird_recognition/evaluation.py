@@ -189,14 +189,13 @@ def optimize(
     prob_df:pd.DataFrame,
     num_kfolds:int,
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
-    mode_list:list, #example: ['lgbm', 'xgb', 'cat']
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
     for kfold_index in range(num_kfolds):
-        for mode in mode_list:
-            clf = pickle.load(open(config.weights_filepath_dict[mode][kfold_index], "rb"))
+        for mode in weights_filepath_dict.keys():
+            clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
                 y_preda = clf.predict(X.astype(np.float32))
             else:
@@ -244,15 +243,19 @@ def make_submission(
     prob_df:pd.DataFrame,
     num_kfolds:int,
     th:float,
-    weights_filepath_list:List[str],
+    weights_filepath_dict:dict,
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
     for kfold_index in range(num_kfolds):
-        clf = pickle.load(open(weights_filepath_list[kfold_index], "rb"))
-        y_preda = clf.predict_proba(X)[:,1]
-        y_preda_list.append(y_preda)
+        for mode in weights_filepath_dict.keys():
+            clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
+            if mode=='lgbm':
+                y_preda = clf.predict(X.astype(np.float32))
+            else:
+                y_preda = clf.predict_proba(X)[:,1]
+            y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)  
     _gdf = candidate_df[y_preda > th].groupby(
         ["audio_id", "seconds"],
@@ -284,7 +287,7 @@ def make_submission(
         "predictions": "birds"
     })
 
-def run(training_config, config, prob_df):
+def run(training_config, config, prob_df, model_dict):
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
         prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
@@ -300,14 +303,16 @@ def run(training_config, config, prob_df):
         prob_df,
         max_distance=training_config.max_distance
     )
-    bird_recognition.training.train(
-        candidate_df,
-        prob_df,
-        num_kfolds=training_config.num_kfolds,
-        weight_rate=training_config.weight_rate,
-        verbose=True,
-        xgb_params=training_config.xgb_params,
-    )
+    for mode in model_dict.keys():
+        bird_recognition.training.train(
+            candidate_df,
+            prob_df,
+            num_kfolds=training_config.num_kfolds,
+            weight_rate=training_config.weight_rate,
+            verbose=True,
+            xgb_params=training_config.xgb_params,
+            mode=mode,
+        )
 
     data = pd.DataFrame(
          [(path.stem, *path.stem.split("_"), path) for path in Path(TEST_AUDIO_ROOT).glob("*.ogg")],
@@ -388,7 +393,7 @@ def run(training_config, config, prob_df):
             candidate_df, 
             prob_df,
             num_kfolds=config.num_kfolds,
-            weights_filepath_list=config.weights_filepath_list
+            weights_filepath_dict=config.weights_filepath_dict,
         )
 
     if config.check_baseline:
@@ -400,7 +405,7 @@ def run(training_config, config, prob_df):
         prob_df,
         num_kfolds=config.num_kfolds,
         th=config.threshold,
-        weights_filepath_list=config.weights_filepath_list,
+        weights_filepath_dict=config.weights_filepath_dict,
     )
     return submission_df
 
