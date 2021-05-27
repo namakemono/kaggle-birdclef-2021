@@ -234,6 +234,51 @@ def optimize(
     print("best F1: %f" % f(th))
     return th
 
+def make_submission(
+    candidate_df:pd.DataFrame,
+    prob_df:pd.DataFrame,
+    num_kfolds:int,
+    th:float,
+    weights_filepath_list:List[str],
+):
+    feature_names = bird_recognition.feature_extraction.get_feature_names()
+    X = candidate_df[feature_names].values
+    y_preda_list = []
+    for kfold_index in range(num_kfolds):
+        clf = pickle.load(open(weights_filepath_list[kfold_index], "rb"))
+        y_preda = clf.predict_proba(X)[:,1]
+        y_preda_list.append(y_preda)
+    y_preda = np.mean(y_preda_list, axis=0)  
+    _gdf = candidate_df[y_preda > th].groupby(
+        ["audio_id", "seconds"],
+        as_index=False
+    )["label"].apply(
+        lambda _: " ".join(_)
+    ).rename(columns={
+        "label": "predictions"
+    })
+    submission_df = pd.merge(
+        prob_df[["row_id", "audio_id", "seconds", "birds"]],
+        _gdf,
+        how="left",
+        on=["audio_id", "seconds"]
+    )
+    submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
+    if TARGET_PATH:
+        score_df = pd.DataFrame(
+            submission_df.apply(
+                lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"]),
+                axis=1
+            ).tolist()
+        )
+        print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
+        print("F1: %.4f" % score_df["f1"].mean())
+        print("Recall: %.4f" % score_df["rec"].mean())
+        print("Precision: %.4f" % score_df["prec"].mean())
+    return submission_df[["row_id", "predictions"]].rename(columns={
+        "predictions": "birds"
+    })
+
 def run(training_config, config, prob_df):
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
@@ -344,4 +389,15 @@ def run(training_config, config, prob_df):
     if config.check_baseline:
         print("閾値でバサッと切ったCVスコア(参考値)")
         bird_recognition.baseline.calc_baseline(prob_df)
+
+    submission_df = make_submission(
+        candidate_df, 
+        prob_df,
+        num_kfolds=config.num_kfolds,
+        th=config.threshold,
+        weights_filepath_list=config.weights_filepath_list,
+    )
+    return submission_df
+
+
 
