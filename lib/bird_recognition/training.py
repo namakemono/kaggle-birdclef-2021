@@ -63,6 +63,7 @@ def train(
                 dtrain,
                 valid_sets=dvalid,
                 verbose_eval=-1,
+                device='gpu',
             )
             oofa[valid_index] = model.predict(X_valid.astype(np.float32))
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
@@ -70,7 +71,7 @@ def train(
         elif mode=='cat':
             train_pool = Pool(X_train[train_index], label=y_train[train_index])
             valid_pool = Pool(X_train[valid_index], label=y_train[valid_index])
-            model = CatBoostClassifier(loss_function='Logloss')
+            model = CatBoostClassifier(loss_function='Logloss', task_type='GPU')
             model.fit(train_pool, verbose=False)
             oofa[valid_index] = model.predict_proba(valid_pool)[:,1]
             pickle.dump(model, open(f"cat_{kfold_index}.pkl", "wb"))
