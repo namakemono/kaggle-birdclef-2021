@@ -69,8 +69,8 @@ def train(
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
             
         elif mode=='cat':
-            train_pool = Pool(X_train[train_index], label=y_train[train_index])
-            valid_pool = Pool(X_train[valid_index], label=y_train[valid_index])
+            train_pool = Pool(X_train, label=y_train)
+            valid_pool = Pool(X_valid, label=y_valid)
             model = CatBoostClassifier(loss_function='Logloss', task_type='GPU')
             model.fit(train_pool, verbose=False)
             oofa[valid_index] = model.predict_proba(valid_pool)[:,1]
