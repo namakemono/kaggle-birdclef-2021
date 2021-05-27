@@ -28,15 +28,20 @@ DURATION = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("DEVICE:", DEVICE)
 
+# 提出用
 TEST_AUDIO_ROOT = Path("../input/birdclef-2021/test_soundscapes")
 SAMPLE_SUB_PATH = "../input/birdclef-2021/sample_submission.csv"
 TARGET_PATH = None
     
-if not len(list(TEST_AUDIO_ROOT.glob("*.ogg"))):
+if not len(list(TEST_AUDIO_ROOT.glob("*.ogg"))): # テスト用の音源がないなら検証用
     TEST_AUDIO_ROOT = Path("../input/birdclef-2021/train_soundscapes")
     SAMPLE_SUB_PATH = None
     # SAMPLE_SUB_PATH = "../input/birdclef-2021/sample_submission.csv"
     TARGET_PATH = Path("../input/birdclef-2021/train_soundscape_labels.csv")
+
+def is_submit_mode() -> bool:
+    """提出時かどうか"""
+    return (TARGET_PATH is None)
 
 class MelSpecComputer:
     def __init__(self, sr, n_mels, fmin, fmax, **kwargs):
@@ -230,6 +235,7 @@ def optimize(
         else:
             ub = th2
     th = (lb + ub) / 2
+    print("-" * 30)
     print("## 下記の閾値をメモして，動作確認時にモデル動作確認用のF1値と一致していることを確認")
     print("📌best threshold: %f" % th)
     print("best F1: %f" % f(th))
@@ -272,6 +278,7 @@ def make_submission(
                 axis=1
             ).tolist()
         )
+        print("-" * 30)
         print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
@@ -281,6 +288,10 @@ def make_submission(
     })
 
 def run(training_config, config, prob_df):
+    ####################################################
+    # テーブルコンペ部分のモデルの訓練
+    # 外部モデルが指定されているならスキップできるとかにする? 
+    ####################################################
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
         prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
@@ -305,6 +316,9 @@ def run(training_config, config, prob_df):
         xgb_params=training_config.xgb_params,
     )
 
+    ######################################################
+    # 以下提出用
+    ######################################################
     data = pd.DataFrame(
          [(path.stem, *path.stem.split("_"), path) for path in Path(TEST_AUDIO_ROOT).glob("*.ogg")],
         columns = ["filename", "id", "site", "date", "filepath"]
@@ -388,6 +402,7 @@ def run(training_config, config, prob_df):
         )
 
     if config.check_baseline:
+        print("-" * 30)
         print("閾値でバサッと切ったCVスコア(参考値)")
         bird_recognition.baseline.calc_baseline(prob_df)
 
