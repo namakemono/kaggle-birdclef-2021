@@ -193,15 +193,19 @@ def optimize(
     candidate_df:pd.DataFrame,
     prob_df:pd.DataFrame,
     num_kfolds:int,
-    weights_filepath_list:List[str],
+    weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
     for kfold_index in range(num_kfolds):
-        clf = pickle.load(open(weights_filepath_list[kfold_index], "rb"))
-        y_preda = clf.predict_proba(X)[:,1]
-        y_preda_list.append(y_preda)
+        for mode in weights_filepath_dict.keys():
+            clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
+            if mode=='lgbm':
+                y_preda = clf.predict(X.astype(np.float32))
+            else:
+                y_preda = clf.predict_proba(X)[:,1]
+            y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     def f(th):
         _df = candidate_df[y_preda > th]
@@ -246,15 +250,19 @@ def make_submission(
     prob_df:pd.DataFrame,
     num_kfolds:int,
     th:float,
-    weights_filepath_list:List[str],
+    weights_filepath_dict:dict,
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
     for kfold_index in range(num_kfolds):
-        clf = pickle.load(open(weights_filepath_list[kfold_index], "rb"))
-        y_preda = clf.predict_proba(X)[:,1]
-        y_preda_list.append(y_preda)
+        for mode in weights_filepath_dict.keys():
+            clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
+            if mode=='lgbm':
+                y_preda = clf.predict(X.astype(np.float32))
+            else:
+                y_preda = clf.predict_proba(X)[:,1]
+            y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)  
     _gdf = candidate_df[y_preda > th].groupby(
         ["audio_id", "seconds"],
@@ -287,7 +295,7 @@ def make_submission(
         "predictions": "birds"
     })
 
-def run(training_config, config, prob_df):
+def run(training_config, config, prob_df, model_dict):
     ####################################################
     # テーブルコンペ部分のモデルの訓練
     # 外部モデルが指定されているならスキップできるとかにする? 
@@ -307,14 +315,17 @@ def run(training_config, config, prob_df):
         prob_df,
         max_distance=training_config.max_distance
     )
-    bird_recognition.training.train(
-        candidate_df,
-        prob_df,
-        num_kfolds=training_config.num_kfolds,
-        weight_rate=training_config.weight_rate,
-        verbose=True,
-        xgb_params=training_config.xgb_params,
-    )
+    for mode in model_dict.keys():
+        print(f'training of {mode} is going...')
+        bird_recognition.training.train(
+            candidate_df,
+            prob_df,
+            num_kfolds=training_config.num_kfolds,
+            weight_rate=training_config.weight_rate,
+            verbose=True,
+            xgb_params=training_config.xgb_params,
+            mode=mode,
+        )
 
     ######################################################
     # 以下提出用
@@ -398,7 +409,7 @@ def run(training_config, config, prob_df):
             candidate_df, 
             prob_df,
             num_kfolds=config.num_kfolds,
-            weights_filepath_list=config.weights_filepath_list
+            weights_filepath_dict=config.weights_filepath_dict,
         )
 
     if config.check_baseline:
@@ -411,7 +422,7 @@ def run(training_config, config, prob_df):
         prob_df,
         num_kfolds=config.num_kfolds,
         th=config.threshold,
-        weights_filepath_list=config.weights_filepath_list,
+        weights_filepath_dict=config.weights_filepath_dict,
     )
     return submission_df
 
