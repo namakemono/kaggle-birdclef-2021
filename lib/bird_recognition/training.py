@@ -57,13 +57,13 @@ def train(
             params = {
                 'objective': 'binary',
                 'metric': 'binary_logloss',
+                'device':'gpu',
             }
             model = lgb.train(
                 params,
                 dtrain,
                 valid_sets=dvalid,
                 verbose_eval=-1,
-                device='gpu',
             )
             oofa[valid_index] = model.predict(X_valid.astype(np.float32))
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
