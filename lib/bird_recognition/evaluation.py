@@ -196,17 +196,11 @@ def optimize(
     y_preda_list = []
     for kfold_index in range(num_kfolds):
         for mode in mode_list:
-            if mode=='tab':
-                clf = TabNetClassifier()
-                clf.load_model(config.qeights_filepath_dict[mode][kfold_index])
-                y_preda = model.predict(X).reshape(-1)
-                
+            clf = pickle.load(open(config.weights_filepath_dict[mode][kfold_index], "rb"))
+            if mode=='lgbm':
+                y_preda = clf.predict(X.astype(np.float32))
             else:
-                clf = pickle.load(open(config.weights_filepath_dict[mode][kfold_index], "rb"))
-                if mode=='lgbm':
-                    y_preda = clf.predict(X.astype(np.float32))
-                else:
-                    y_preda = clf.predict_proba(X)[:,1]
+                y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     def f(th):
