@@ -188,15 +188,26 @@ def optimize(
     candidate_df:pd.DataFrame,
     prob_df:pd.DataFrame,
     num_kfolds:int,
-    weights_filepath_list:List[str],
+    weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
+    mode_list:list, #example: ['lgbm', 'xgb', 'cat']
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
     for kfold_index in range(num_kfolds):
-        clf = pickle.load(open(weights_filepath_list[kfold_index], "rb"))
-        y_preda = clf.predict_proba(X)[:,1]
-        y_preda_list.append(y_preda)
+        for mode in mode_list:
+            if mode=='tab':
+                clf = TabNetClassifier()
+                clf.load_model(config.qeights_filepath_dict[mode][kfold_index])
+                y_preda = model.predict(X).reshape(-1)
+                
+            else:
+                clf = pickle.load(open(config.weights_filepath_dict[mode][kfold_index], "rb"))
+                if mode=='lgbm':
+                    y_preda = clf.predict(X.astype(np.float32))
+                else:
+                    y_preda = clf.predict_proba(X)[:,1]
+            y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     def f(th):
         _df = candidate_df[y_preda > th]
