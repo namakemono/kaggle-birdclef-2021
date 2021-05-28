@@ -302,13 +302,14 @@ def run(training_config, config, prob_df, model_dict):
     ####################################################
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
-        prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
+        prob_df = prob_df[prob_df["rating"] >= training_config.min_rating].reset_index(drop=True)
         print("after: %d" % len(prob_df))
     candidate_df = bird_recognition.candidate_extraction.make_candidates(
         prob_df,
         num_spieces=training_config.num_spieces,
         num_candidates=training_config.num_candidates,
-        max_distance=training_config.max_distance
+        max_distance=training_config.max_distance,
+        nocall_threshold=training_config.nocall_threshold
     )
     candidate_df = bird_recognition.feature_extraction.add_features(
         candidate_df,
@@ -326,7 +327,7 @@ def run(training_config, config, prob_df, model_dict):
             xgb_params=training_config.xgb_params,
             mode=mode,
             sampling_strategy=training_config.sampling_strategy,
-            random_state=training_config.random_state,
+            random_state=training_config.random_state
         )
 
     ######################################################
@@ -397,7 +398,8 @@ def run(training_config, config, prob_df, model_dict):
         num_spieces=config.num_spieces,
         num_candidates=config.num_candidates,
         max_distance=config.max_distance,
-        num_prob=config.num_prob
+        num_prob=config.num_prob,
+        nocall_threshold=config.nocall_threshold
     )
     # 特徴量の追加
     candidate_df = bird_recognition.feature_extraction.add_features(
