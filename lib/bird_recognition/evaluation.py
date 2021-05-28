@@ -32,7 +32,7 @@ print("DEVICE:", DEVICE)
 TEST_AUDIO_ROOT = Path("../input/birdclef-2021/test_soundscapes")
 SAMPLE_SUB_PATH = "../input/birdclef-2021/sample_submission.csv"
 TARGET_PATH = None
-    
+
 if not len(list(TEST_AUDIO_ROOT.glob("*.ogg"))): # テスト用の音源がないなら検証用
     TEST_AUDIO_ROOT = Path("../input/birdclef-2021/train_soundscapes")
     SAMPLE_SUB_PATH = None
@@ -66,7 +66,7 @@ def mono_to_color(X, eps=1e-6, mean=None, std=None):
     mean = mean or X.mean()
     std = std or X.std()
     X = (X - mean) / (std + eps)
-    
+
     _min, _max = X.min(), X.max()
 
     if (_max - _min) > eps:
@@ -87,9 +87,9 @@ def crop_or_pad(y, length):
 
 class BirdCLEFDataset(Dataset):
     def __init__(self, data, sr=SR, n_mels=128, fmin=0, fmax=None, duration=DURATION, step=None, res_type="kaiser_fast", resample=True):
-        
+
         self.data = data
-        
+
         self.sr = sr
         self.n_mels = n_mels
         self.fmin = fmin
@@ -98,7 +98,7 @@ class BirdCLEFDataset(Dataset):
         self.duration = duration
         self.audio_length = self.duration*self.sr
         self.step = step or self.audio_length
-        
+
         self.res_type = res_type
         self.resample = resample
 
@@ -109,18 +109,18 @@ class BirdCLEFDataset(Dataset):
             fmax=self.fmax
         )
         self._cache_audio_to_images = {} # audio filepath -> images
-        
+
     def __len__(self):
         return len(self.data)
-    
+
     @staticmethod
     def normalize(image):
         image = image.astype("float32", copy=False) / 255.0
         image = np.stack([image, image, image])
         return image
-    
+
     def audio_to_image(self, audio):
-        melspec = self.mel_spec_computer(audio) 
+        melspec = self.mel_spec_computer(audio)
         image = mono_to_color(melspec)
         image = self.normalize(image)
         return image
@@ -146,7 +146,7 @@ class BirdCLEFDataset(Dataset):
             self._cache_audio_to_images[filepath] = images
         return self._cache_audio_to_images[filepath]
 
-        
+
     def __getitem__(self, idx):
         return self.read_file(self.data.loc[idx, "filepath"])
 
@@ -263,7 +263,7 @@ def make_submission(
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
-    y_preda = np.mean(y_preda_list, axis=0)  
+    y_preda = np.mean(y_preda_list, axis=0)
     _gdf = candidate_df[y_preda > th].groupby(
         ["audio_id", "seconds"],
         as_index=False
@@ -298,7 +298,7 @@ def make_submission(
 def run(training_config, config, prob_df, model_dict):
     ####################################################
     # テーブルコンペ部分のモデルの訓練
-    # 外部モデルが指定されているならスキップできるとかにする? 
+    # 外部モデルが指定されているならスキップできるとかにする?
     ####################################################
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
@@ -410,7 +410,7 @@ def run(training_config, config, prob_df, model_dict):
 
     if TARGET_PATH:
         optimize(
-            candidate_df, 
+            candidate_df,
             prob_df,
             num_kfolds=config.num_kfolds,
             weights_filepath_dict=config.weights_filepath_dict,
@@ -422,7 +422,7 @@ def run(training_config, config, prob_df, model_dict):
         bird_recognition.baseline.calc_baseline(prob_df)
 
     submission_df = make_submission(
-        candidate_df, 
+        candidate_df,
         prob_df,
         num_kfolds=config.num_kfolds,
         th=config.threshold,
