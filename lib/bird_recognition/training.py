@@ -22,6 +22,8 @@ def train(
     xgb_params:dict=None,
     verbose:bool=False,
     mode=None,
+    sampling_strategy:float=1.0,
+    random_state:int=777
 ):
     if xgb_params is None:
         xgb_params = {
@@ -47,7 +49,10 @@ def train(
         #----------------------------------------------------------------------
         if mode=='lgbm' or mode=='cat' or mode=='tab':
             # 正例を10％まであげる
-            ros = RandomOverSampler(sampling_strategy=1.0)
+            ros = RandomOverSampler(
+                sampling_strategy=sampling_strategy,
+                random_state=random_state
+            )
             # 学習用データに反映
             X_train, y_train = ros.fit_resample(X_train, y_train)
             
@@ -91,7 +96,7 @@ def train(
                     (X_valid, y_valid)
                 ],
                 eval_metric             = "logloss",
-                verbose                 = None,
+                verbose                 = 10, # None,
                 early_stopping_rounds   = 20,
                 sample_weight           = sample_weight,
                 sample_weight_eval_set  = sample_weight_eval_set,
@@ -101,7 +106,10 @@ def train(
         #----------------------------------------------------------------------
 
     def f(th):
-        _gdf = candidate_df[oofa > th].groupby(
+        _df = candidate_df[oofa > th]
+        if len(_df) == 0:
+            return 0
+        _gdf = _df.groupby(
             ["audio_id", "seconds"],
             as_index=False
         )["label"].apply(lambda _: " ".join(_))
