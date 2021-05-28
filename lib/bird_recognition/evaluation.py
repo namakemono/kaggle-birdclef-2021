@@ -395,7 +395,8 @@ def run(training_config, config, prob_df, model_dict):
         num_spieces=config.num_spieces,
         num_candidates=config.num_candidates,
         max_distance=config.max_distance,
-        num_prob=config.num_prob
+        num_prob=config.num_prob,
+        nocall_threshold=config.nocall_threshold
     )
     # 特徴量の追加
     candidate_df = bird_recognition.feature_extraction.add_features(

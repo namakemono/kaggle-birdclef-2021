@@ -4,14 +4,26 @@ import pandas as pd
 from . import datasets
 from . import feature_extraction
 
+
+def to_birds(row, th:float) -> str:
+    if row["call_prob"] < th:
+        return "nocall"
+    res = [row["primary_label"]] + eval(row["secondary_labels"])
+    return " ".join(res)
+
 def make_candidates(
     prob_df:pd.DataFrame,
     num_spieces:int,
     num_candidates:int,
     max_distance:int,
     num_prob:int=6, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
+    nocall_threshold:float=0.1940,
 ):
     if "author" in prob_df.columns: # メタデータ(図鑑/short audio)
+        prob_df["birds"] = prob_df.apply(
+            lambda row: to_birds(row, th=nocall_threshold),
+            axis=1
+        )
         prob_df["audio_id"] = prob_df["filename"].apply(
             lambda _: int(_.replace("XC", "").replace(".ogg", ""))
         )
