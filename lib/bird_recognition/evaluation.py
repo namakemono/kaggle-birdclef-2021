@@ -429,6 +429,8 @@ def run(training_config, config, prob_df, model_dict):
         max_distance=config.max_distance
     )
 
+    
+    '''
     if TARGET_PATH:
         optimize(
             candidate_df,
@@ -436,7 +438,7 @@ def run(training_config, config, prob_df, model_dict):
             num_kfolds=config.num_kfolds,
             weights_filepath_dict=config.weights_filepath_dict,
         )
-
+    '''
     if config.check_baseline:
         print("-" * 30)
         print("閾値でバサッと切ったCVスコア(参考値)")
