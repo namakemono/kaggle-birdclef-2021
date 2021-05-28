@@ -17,13 +17,14 @@ def make_candidates(
     num_candidates:int,
     max_distance:int,
     num_prob:int=6, # 前後の確保するフレームの数(3なら前のフレーム3個, 後のフレーム3個)
-    nocall_threshold:float=0.1940,
+    nocall_threshold:float=0.5,
 ):
     if "author" in prob_df.columns: # メタデータ(図鑑/short audio)
         prob_df["birds"] = prob_df.apply(
             lambda row: to_birds(row, th=nocall_threshold),
             axis=1
         )
+        print("Candidate nocall ratio: %.4f" % (prob_df["birds"] == "nocall").mean())
         prob_df["audio_id"] = prob_df["filename"].apply(
             lambda _: int(_.replace("XC", "").replace(".ogg", ""))
         )

@@ -47,15 +47,16 @@ def train(
         X_valid, y_valid = X[valid_index], y[valid_index]
 
         #----------------------------------------------------------------------
-        if mode=='lgbm' or mode=='cat' or mode=='tab':
-            # 正例を10％まであげる
-            ros = RandomOverSampler(
-                sampling_strategy=sampling_strategy,
-                random_state=random_state
-            )
-            # 学習用データに反映
-            X_train, y_train = ros.fit_resample(X_train, y_train)
-            
+        if mode=="xgb" or mode=='lgbm' or mode=='cat' or mode=='tab':
+            if sampling_strategy is not None:
+                # 正例を10％まであげる
+                ros = RandomOverSampler(
+                    sampling_strategy=sampling_strategy,
+                    random_state=random_state
+                )
+                # 学習用データに反映
+                X_train, y_train = ros.fit_resample(X_train, y_train)
+                print("Resampled. positive ratio: %.4f" % np.mean(y_train))            
         if mode=='lgbm':
             dtrain = lgb.Dataset(X_train, label=y_train)
             dvalid = lgb.Dataset(X_valid, label=y_valid)
