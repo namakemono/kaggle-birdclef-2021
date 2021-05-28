@@ -294,22 +294,6 @@ def make_submission(
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
         print("Precision: %.4f" % score_df["prec"].mean())
-    submission_df = bird_recognition.postprocessing.filter_by_rules(
-        submission_df,
-        max_distance=max_distance
-    )
-    if TARGET_PATH:
-        score_df = pd.DataFrame(
-            submission_df.apply(
-                lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"]),
-                axis=1
-            ).tolist()
-        )
-        print("-" * 30)
-        print("AFTER(ルールベースでのフィルタリング後)")
-        print("F1: %.4f" % score_df["f1"].mean())
-        print("Recall: %.4f" % score_df["rec"].mean())
-        print("Precision: %.4f" % score_df["prec"].mean())
     return submission_df[["row_id", "predictions"]].rename(columns={
         "predictions": "birds"
     })
