@@ -17,6 +17,8 @@ import lightgbm as lgb
 def train(
     candidate_df:pd.DataFrame,
     df:pd.DataFrame,
+    candidate_df_soundscapes:pd.DataFrame,
+    df_soundscapes:pd.DataFrame,
     num_kfolds:int,
     weight_rate:float=2.5,
     xgb_params:dict=None,
@@ -31,26 +33,48 @@ def train(
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
+        
+        
+    # short audio の  k fold
+    groups = candidate_df["audio_id"]
+    candidate_df["is_soundscapes"] = False
+    df["is_soundscapes"] = False
+    kf = StratifiedGroupKFold(n_splits=num_kfolds)
+    for kfold_index, (_, valid_index) in enumerate(kf.split(candidate_df[feature_names].values, candidate_df["target"].values, groups)):
+        candidate_df.loc[valid_index, "fold"] = kfold_index
+        
+    # sound scape の  k fold
+    groups = candidate_df_soundscapes["audio_id"]
+    candidate_df_soundscapes["is_soundscapes"] = True
+    df_soundscapes["is_soundscapes"] = True
+    kf = StratifiedGroupKFold(n_splits=num_kfolds)
+    for kfold_index, (_, valid_index) in enumerate(kf.split(candidate_df_soundscapes[feature_names].values, 
+                                                            candidate_df_soundscapes["target"].values, groups)):
+        candidate_df_soundscapes.loc[valid_index, "fold"] = kfold_index 
+        
+    # 結合
+    candidate_df = pd.concat([candidate_df, candidate_df_soundscapes])
+    df = pd.concat([df, df_soundscapes])
+        
     X = candidate_df[feature_names].values
     y = candidate_df["target"].values
-    groups = candidate_df["audio_id"]
-    kf = StratifiedGroupKFold(n_splits=num_kfolds)
-    for kfold_index, (_, valid_index) in enumerate(kf.split(X, y, groups)):
-        candidate_df.loc[valid_index, "fold"] = kfold_index
     oofa = np.zeros(len(y), dtype=np.float32)
+    
     for kfold_index in range(num_kfolds):
         train_index = candidate_df[candidate_df["fold"] != kfold_index].index
         valid_index = candidate_df[candidate_df["fold"] == kfold_index].index
         X_train, y_train = X[train_index], y[train_index]
         X_valid, y_valid = X[valid_index], y[valid_index]
 
+        
         #----------------------------------------------------------------------
+        '''
         if mode=='lgbm' or mode=='cat' or mode=='tab':
             # 正例を10％まであげる
-            ros = RandomOverSampler(sampling_strategy=1.0)
+            ros = RandomOverSampler(sampling_strategy=1.0, random_state=777)
             # 学習用データに反映
             X_train, y_train = ros.fit_resample(X_train, y_train)
-            
+        '''    
         if mode=='lgbm':
             dtrain = lgb.Dataset(X_train, label=y_train)
             dvalid = lgb.Dataset(X_valid, label=y_valid)
@@ -71,8 +95,8 @@ def train(
         elif mode=='cat':
             train_pool = Pool(X_train, label=y_train)
             valid_pool = Pool(X_valid, label=y_valid)
-            model = CatBoostClassifier(loss_function='Logloss', task_type='GPU')
-            model.fit(train_pool, verbose=False)
+            model = CatBoostClassifier(iterations=1000, loss_function='Logloss', task_type='GPU')
+            model.fit(train_pool, eval_set=valid_pool, verbose=100, early_stopping_rounds=100)
             oofa[valid_index] = model.predict_proba(valid_pool)[:,1]
             pickle.dump(model, open(f"cat_{kfold_index}.pkl", "wb"))
             
@@ -100,18 +124,20 @@ def train(
             oofa[valid_index] = clf.predict_proba(X_valid)[:,1]
         #----------------------------------------------------------------------
 
-    def f(th):
+    def f(th, only_soundscapes = False):
         _gdf = candidate_df[oofa > th].groupby(
             ["audio_id", "seconds"],
             as_index=False
         )["label"].apply(lambda _: " ".join(_))
         df2 = pd.merge(
-            df[["audio_id", "seconds", "birds"]],
+            df[["audio_id", "seconds", "birds","is_soundscapes"]],
             _gdf,
             how="left",
             on=["audio_id", "seconds"]
         )
         df2.loc[df2["label"].isnull(), "label"] = "nocall"
+        if only_soundscapes:
+            df2 = df2[df2["is_soundscapes"]==True]
         return df2.apply(
             lambda _: metrics.get_metrics(_["birds"], _["label"])["f1"],
             axis=1
@@ -137,5 +163,3 @@ def train(
         print("Accuracy: %.4f" % accuracy_score(y, oof))
         print("Recall: %.4f" % recall_score(y, oof))
         print("Precision: %.4f" % precision_score(y, oof))
-
-
