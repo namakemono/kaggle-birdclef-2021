@@ -251,6 +251,7 @@ def make_submission(
     num_kfolds:int,
     th:float,
     weights_filepath_dict:dict,
+    max_distance:int
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
@@ -273,7 +274,7 @@ def make_submission(
         "label": "predictions"
     })
     submission_df = pd.merge(
-        prob_df[["row_id", "audio_id", "seconds", "birds"]],
+        prob_df[["row_id", "audio_id", "seconds", "birds", "site", "month"]],
         _gdf,
         how="left",
         on=["audio_id", "seconds"]
@@ -287,6 +288,24 @@ def make_submission(
             ).tolist()
         )
         print("-" * 30)
+        print("BEFORE")
+        print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
+        print("F1: %.4f" % score_df["f1"].mean())
+        print("Recall: %.4f" % score_df["rec"].mean())
+        print("Precision: %.4f" % score_df["prec"].mean())
+    submission_df = bird_recognition.postprocessing.filter_by_rules(
+        submission_df,
+        max_distance=max_distance
+    )
+    if TARGET_PATH:
+        score_df = pd.DataFrame(
+            submission_df.apply(
+                lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"]),
+                axis=1
+            ).tolist()
+        )
+        print("-" * 30)
+        print("AFTER")
         print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
@@ -427,6 +446,7 @@ def run(training_config, config, prob_df, model_dict):
         num_kfolds=config.num_kfolds,
         th=config.threshold,
         weights_filepath_dict=config.weights_filepath_dict,
+        max_distance=config.max_distance
     )
     return submission_df
 
