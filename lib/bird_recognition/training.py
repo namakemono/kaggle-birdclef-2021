@@ -55,7 +55,7 @@ def train(
             )
             # 学習用データに反映
             X_train, y_train = ros.fit_resample(X_train, y_train)
-            
+
         if mode=='lgbm':
             dtrain = lgb.Dataset(X_train, label=y_train)
             dvalid = lgb.Dataset(X_valid, label=y_valid)
@@ -72,7 +72,7 @@ def train(
             )
             oofa[valid_index] = model.predict(X_valid.astype(np.float32))
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
-            
+
         elif mode=='cat':
             train_pool = Pool(X_train, label=y_train)
             valid_pool = Pool(X_valid, label=y_valid)
@@ -80,7 +80,7 @@ def train(
             model.fit(train_pool, verbose=False)
             oofa[valid_index] = model.predict_proba(valid_pool)[:,1]
             pickle.dump(model, open(f"cat_{kfold_index}.pkl", "wb"))
-            
+
         elif mode=='xgb':
             # 正例の重みを weight_rate, 負例を1にする
             sample_weight = np.ones(y_train.shape)
