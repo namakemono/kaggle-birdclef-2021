@@ -28,15 +28,20 @@ DURATION = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("DEVICE:", DEVICE)
 
+# 提出用
 TEST_AUDIO_ROOT = Path("../input/birdclef-2021/test_soundscapes")
 SAMPLE_SUB_PATH = "../input/birdclef-2021/sample_submission.csv"
 TARGET_PATH = None
-    
-if not len(list(TEST_AUDIO_ROOT.glob("*.ogg"))):
+
+if not len(list(TEST_AUDIO_ROOT.glob("*.ogg"))): # テスト用の音源がないなら検証用
     TEST_AUDIO_ROOT = Path("../input/birdclef-2021/train_soundscapes")
     SAMPLE_SUB_PATH = None
     # SAMPLE_SUB_PATH = "../input/birdclef-2021/sample_submission.csv"
     TARGET_PATH = Path("../input/birdclef-2021/train_soundscape_labels.csv")
+
+def is_submit_mode() -> bool:
+    """提出時かどうか"""
+    return (TARGET_PATH is None)
 
 class MelSpecComputer:
     def __init__(self, sr, n_mels, fmin, fmax, **kwargs):
@@ -61,7 +66,7 @@ def mono_to_color(X, eps=1e-6, mean=None, std=None):
     mean = mean or X.mean()
     std = std or X.std()
     X = (X - mean) / (std + eps)
-    
+
     _min, _max = X.min(), X.max()
 
     if (_max - _min) > eps:
@@ -82,9 +87,9 @@ def crop_or_pad(y, length):
 
 class BirdCLEFDataset(Dataset):
     def __init__(self, data, sr=SR, n_mels=128, fmin=0, fmax=None, duration=DURATION, step=None, res_type="kaiser_fast", resample=True):
-        
+
         self.data = data
-        
+
         self.sr = sr
         self.n_mels = n_mels
         self.fmin = fmin
@@ -93,7 +98,7 @@ class BirdCLEFDataset(Dataset):
         self.duration = duration
         self.audio_length = self.duration*self.sr
         self.step = step or self.audio_length
-        
+
         self.res_type = res_type
         self.resample = resample
 
@@ -104,18 +109,18 @@ class BirdCLEFDataset(Dataset):
             fmax=self.fmax
         )
         self._cache_audio_to_images = {} # audio filepath -> images
-        
+
     def __len__(self):
         return len(self.data)
-    
+
     @staticmethod
     def normalize(image):
         image = image.astype("float32", copy=False) / 255.0
         image = np.stack([image, image, image])
         return image
-    
+
     def audio_to_image(self, audio):
-        melspec = self.mel_spec_computer(audio) 
+        melspec = self.mel_spec_computer(audio)
         image = mono_to_color(melspec)
         image = self.normalize(image)
         return image
@@ -141,7 +146,7 @@ class BirdCLEFDataset(Dataset):
             self._cache_audio_to_images[filepath] = images
         return self._cache_audio_to_images[filepath]
 
-        
+
     def __getitem__(self, idx):
         return self.read_file(self.data.loc[idx, "filepath"])
 
@@ -234,7 +239,9 @@ def optimize(
         else:
             ub = th2
     th = (lb + ub) / 2
-    print("best threshold: %f" % th)
+    print("-" * 30)
+    print("## 下記の閾値をメモして，動作確認時にモデル動作確認用のF1値と一致していることを確認")
+    print("📌best threshold: %f" % th)
     print("best F1: %f" % f(th))
     return th
 
@@ -244,6 +251,7 @@ def make_submission(
     num_kfolds:int,
     th:float,
     weights_filepath_dict:dict,
+    max_distance:int
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
@@ -256,7 +264,7 @@ def make_submission(
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
-    y_preda = np.mean(y_preda_list, axis=0)  
+    y_preda = np.mean(y_preda_list, axis=0)
     _gdf = candidate_df[y_preda > th].groupby(
         ["audio_id", "seconds"],
         as_index=False
@@ -266,7 +274,7 @@ def make_submission(
         "label": "predictions"
     })
     submission_df = pd.merge(
-        prob_df[["row_id", "audio_id", "seconds", "birds"]],
+        prob_df[["row_id", "audio_id", "seconds", "birds", "site", "month"]],
         _gdf,
         how="left",
         on=["audio_id", "seconds"]
@@ -279,7 +287,10 @@ def make_submission(
                 axis=1
             ).tolist()
         )
+        print("-" * 30)
+        print("BEFORE(ルールベースのフィルタリングを掛ける前)")
         print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
+        print("上のピン📌と一致するか確認")
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
         print("Precision: %.4f" % score_df["prec"].mean())
@@ -288,15 +299,20 @@ def make_submission(
     })
 
 def run(training_config, config, prob_df, model_dict):
+    ####################################################
+    # テーブルコンペ部分のモデルの訓練
+    # 外部モデルが指定されているならスキップできるとかにする?
+    ####################################################
     if training_config.min_rating:
         print("before: %d" % len(prob_df))
-        prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
+        prob_df = prob_df[prob_df["rating"] >= training_config.min_rating].reset_index(drop=True)
         print("after: %d" % len(prob_df))
     candidate_df = bird_recognition.candidate_extraction.make_candidates(
         prob_df,
         num_spieces=training_config.num_spieces,
         num_candidates=training_config.num_candidates,
-        max_distance=training_config.max_distance
+        max_distance=training_config.max_distance,
+        nocall_threshold=training_config.nocall_threshold
     )
     candidate_df = bird_recognition.feature_extraction.add_features(
         candidate_df,
@@ -313,8 +329,13 @@ def run(training_config, config, prob_df, model_dict):
             verbose=True,
             xgb_params=training_config.xgb_params,
             mode=mode,
+            sampling_strategy=training_config.sampling_strategy,
+            random_state=training_config.random_state
         )
 
+    ######################################################
+    # 以下提出用
+    ######################################################
     data = pd.DataFrame(
          [(path.stem, *path.stem.split("_"), path) for path in Path(TEST_AUDIO_ROOT).glob("*.ogg")],
         columns = ["filename", "id", "site", "date", "filepath"]
@@ -380,7 +401,8 @@ def run(training_config, config, prob_df, model_dict):
         num_spieces=config.num_spieces,
         num_candidates=config.num_candidates,
         max_distance=config.max_distance,
-        num_prob=config.num_prob
+        num_prob=config.num_prob,
+        nocall_threshold=config.nocall_threshold
     )
     # 特徴量の追加
     candidate_df = bird_recognition.feature_extraction.add_features(
@@ -391,22 +413,24 @@ def run(training_config, config, prob_df, model_dict):
 
     if TARGET_PATH:
         optimize(
-            candidate_df, 
+            candidate_df,
             prob_df,
             num_kfolds=config.num_kfolds,
             weights_filepath_dict=config.weights_filepath_dict,
         )
 
     if config.check_baseline:
+        print("-" * 30)
         print("閾値でバサッと切ったCVスコア(参考値)")
         bird_recognition.baseline.calc_baseline(prob_df)
 
     submission_df = make_submission(
-        candidate_df, 
+        candidate_df,
         prob_df,
         num_kfolds=config.num_kfolds,
         th=config.threshold,
         weights_filepath_dict=config.weights_filepath_dict,
+        max_distance=config.max_distance
     )
     return submission_df
 
