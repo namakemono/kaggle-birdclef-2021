@@ -108,7 +108,9 @@ class BirdCLEFDataset(Dataset):
             fmin=self.fmin,
             fmax=self.fmax
         )
-        self._cache_audio_to_images = {} # audio filepath -> images
+        self.npy_save_root = Path("./data")
+        
+        os.makedirs(self.npy_save_root, exist_ok=True)
 
     def __len__(self):
         return len(self.data)
@@ -126,7 +128,10 @@ class BirdCLEFDataset(Dataset):
         return image
 
     def read_file(self, filepath):
-        if not filepath in self._cache_audio_to_images:
+        filename = filepath.stem
+        npy_path = self.npy_save_root / f"{filename}.npy"
+        
+        if not os.path.exists(npy_path):
             audio, orig_sr = sf.read(filepath, dtype="float32")
 
             if self.resample and orig_sr != self.sr:
@@ -143,9 +148,9 @@ class BirdCLEFDataset(Dataset):
 
             images = [self.audio_to_image(audio) for audio in audios]
             images = np.stack(images)
-            self._cache_audio_to_images[filepath] = images
-        return self._cache_audio_to_images[filepath]
-
+            
+            np.save(str(npy_path), images)
+        return np.load(npy_path)
 
     def __getitem__(self, idx):
         return self.read_file(self.data.loc[idx, "filepath"])
