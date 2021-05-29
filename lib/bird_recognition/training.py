@@ -13,7 +13,23 @@ from catboost import Pool
 from imblearn.over_sampling import RandomOverSampler
 import lightgbm as lgb
 
+import os
+import random
 
+import numpy as np
+import tensorflow as tf
+import torch
+
+
+def seed_everything(seed=1234):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    
 def train(
     candidate_df:pd.DataFrame,
     df:pd.DataFrame,
@@ -25,6 +41,8 @@ def train(
     sampling_strategy:float=1.0,
     random_state:int=777
 ):
+    seed_everything(random_state)
+    
     if xgb_params is None:
         xgb_params = {
             "objective": "binary:logistic",
