@@ -298,46 +298,9 @@ def make_submission(
         "predictions": "birds"
     })
 
-def run(training_config, config, prob_df, model_dict):
-    ####################################################
-    # テーブルコンペ部分のモデルの訓練
-    # 外部モデルが指定されているならスキップできるとかにする?
-    ####################################################
-    if training_config.min_rating:
-        print("before: %d" % len(prob_df))
-        prob_df = prob_df[prob_df["rating"] >= training_config.min_rating].reset_index(drop=True)
-        print("after: %d" % len(prob_df))
-    candidate_df = bird_recognition.candidate_extraction.make_candidates(
-        prob_df,
-        num_spieces=training_config.num_spieces,
-        num_candidates=training_config.num_candidates,
-        max_distance=training_config.max_distance,
-        nocall_threshold=training_config.nocall_threshold
-    )
-    candidate_df = bird_recognition.feature_extraction.add_features(
-        candidate_df,
-        prob_df,
-        max_distance=training_config.max_distance
-    )
-    for mode in model_dict.keys():
-        print(f'training of {mode} is going...')
-        bird_recognition.training.train(
-            candidate_df,
-            prob_df,
-            num_kfolds=training_config.num_kfolds,
-            weight_rate=training_config.weight_rate,
-            verbose=True,
-            xgb_params=training_config.xgb_params,
-            mode=mode,
-            sampling_strategy=training_config.sampling_strategy,
-            random_state=training_config.random_state
-        )
-
-    ######################################################
-    # 以下提出用
-    ######################################################
+def get_prob_df(config, audio_paths):
     data = pd.DataFrame(
-         [(path.stem, *path.stem.split("_"), path) for path in Path(TEST_AUDIO_ROOT).glob("*.ogg")],
+         [(path.stem, *path.stem.split("_"), path) for path in Path(audio_paths).glob("*.ogg")],
         columns = ["filename", "id", "site", "date", "filepath"]
     )
     LABEL_IDS = bird_recognition.datasets.get_bird_label_to_index()
@@ -360,7 +323,7 @@ def run(training_config, config, prob_df, model_dict):
             n = len(data)
             audio_id_to_date = {}
             audio_id_to_site = {}
-            for filepath in TEST_AUDIO_ROOT.glob("*.ogg"):
+            for filepath in audio_paths.glob("*.ogg"):
                 audio_id, site, date = os.path.basename(filepath).replace(".ogg", "").split("_")
                 audio_id = int(audio_id)
                 audio_id_to_date[audio_id] = date
@@ -382,7 +345,7 @@ def run(training_config, config, prob_df, model_dict):
             print(f"Save to {prob_filepath}")
             prob_df.to_csv(prob_filepath, index=False)
 
-    # 予測結果のアンサンブ
+    # 予測結果のアンサンブル
     prob_df = pd.read_csv(
         config.get_prob_filepath_from_checkpoint(config.checkpoint_paths[0])
     )
@@ -394,6 +357,65 @@ def run(training_config, config, prob_df, model_dict):
             )
             prob_df[columns] += _df[columns]
         prob_df[columns] /= len(config.checkpoint_paths)
+
+    return prob_df
+
+def run(training_config, config, prob_df, model_dict):
+    ####################################################
+    # テーブルコンペ部分のモデルの訓練
+    # 外部モデルが指定されているならスキップできるとかにする? 
+    ####################################################
+    
+    # short audio
+    if training_config.min_rating:
+        print("before: %d" % len(prob_df))
+        prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
+        print("after: %d" % len(prob_df))
+    candidate_df = bird_recognition.candidate_extraction.make_candidates(
+        prob_df,
+        num_spieces=training_config.num_spieces,
+        num_candidates=training_config.num_candidates,
+        max_distance=training_config.max_distance
+    )
+    candidate_df = bird_recognition.feature_extraction.add_features(
+        candidate_df,
+        prob_df,
+        max_distance=training_config.max_distance
+    )
+    
+    # soundscapes
+    prob_df_soundscapes = bird_recognition.evaluation.get_prob_df(config,Path("../input/birdclef-2021/train_soundscapes"))
+    candidate_df_soundscapes = bird_recognition.candidate_extraction.make_candidates(
+        prob_df_soundscapes,
+        num_spieces=training_config.num_spieces,
+        num_candidates=training_config.num_candidates,
+        max_distance=training_config.max_distance
+    )
+    candidate_df_soundscapes = bird_recognition.feature_extraction.add_features(
+        candidate_df_soundscapes,
+        prob_df_soundscapes,
+        max_distance=training_config.max_distance
+    )    
+    
+    
+    for mode in model_dict.keys():
+        print(f'training of {mode} is going...')
+        bird_recognition.training.train(
+            candidate_df,
+            prob_df,
+            candidate_df_soundscapes,
+            prob_df_soundscapes,
+            num_kfolds=training_config.num_kfolds,
+            weight_rate=training_config.weight_rate,
+            verbose=True,
+            xgb_params=training_config.xgb_params,
+            mode=mode,
+        )
+
+    ######################################################
+    # 以下提出用
+    ######################################################
+    prob_df = get_prob_df(config, TEST_AUDIO_ROOT)
 
     # 候補抽出
     candidate_df = bird_recognition.candidate_extraction.make_candidates(
@@ -411,6 +433,7 @@ def run(training_config, config, prob_df, model_dict):
         max_distance=config.max_distance
     )
 
+    
     if TARGET_PATH:
         optimize(
             candidate_df,
@@ -418,7 +441,6 @@ def run(training_config, config, prob_df, model_dict):
             num_kfolds=config.num_kfolds,
             weights_filepath_dict=config.weights_filepath_dict,
         )
-
     if config.check_baseline:
         print("-" * 30)
         print("閾値でバサッと切ったCVスコア(参考値)")
