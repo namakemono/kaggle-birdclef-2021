@@ -194,6 +194,9 @@ def predict(nets, test_data, names=True):
             preds.append(pred)
     return preds
 
+
+    
+    
 def optimize(
     candidate_df:pd.DataFrame,
     prob_df:pd.DataFrame,
@@ -212,6 +215,8 @@ def optimize(
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)
+    candidate_df["y_preda"] = y_preda
+    
     def f(th):
         _df = candidate_df[y_preda > th]
         if len(_df) == 0:
@@ -235,6 +240,7 @@ def optimize(
             lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
             axis=1
         ).mean()
+    
     lb, ub = 0, 1
     for k in range(30):
         th1 = (lb * 2 + ub) / 3
@@ -248,13 +254,68 @@ def optimize(
     print("## 下記の閾値をメモして，動作確認時にモデル動作確認用のF1値と一致していることを確認")
     print("📌best threshold: %f" % th)
     print("best F1: %f" % f(th))
-    return th
+    
+    # nocall injection
+    _df = candidate_df[y_preda > th]
+    if len(_df) == 0:
+        return 0
+    _gdf = _df.groupby(
+            ["audio_id", "seconds"],
+            as_index=False
+    )["label"].apply(
+        lambda _: " ".join(_)
+    ).rename(columns={
+        "label": "predictions"
+    })
+    submission_df = pd.merge(
+            prob_df[["row_id", "audio_id", "seconds", "birds"]],
+            _gdf,
+            how="left",
+            on=["audio_id", "seconds"]
+        )
+    submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
+
+    
+    _gdf2 = _df.groupby(
+            ["audio_id", "seconds"],
+            as_index=False
+    )["y_preda"].sum()
+    submission_df = pd.merge(
+            submission_df,
+            _gdf2,
+            how="left",
+            on=["audio_id", "seconds"]
+        )
+    def f_nocall(nocall_th):
+        submission_df_with_nocall = submission_df.copy()
+        submission_df_with_nocall.loc[(submission_df_with_nocall["y_preda"]<nocall_th) 
+                                      & (submission_df_with_nocall["predictions"]!="nocall"), "predictions"] += " nocall"
+        return submission_df_with_nocall.apply(
+            lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
+            axis=1
+        ).mean()
+    lb, ub = 0, 1
+    for k in range(30):
+        th1 = (lb * 2 + ub) / 3
+        th2 = (lb + ub * 2) / 3
+        if f_nocall(th1) < f_nocall(th2):
+            lb = th1
+        else:
+            ub = th2
+    th = (lb + ub) / 2
+    print("-" * 30)
+    print("## nocall injection")
+    print("📌best nocall threshold: %f" % th)
+    print("best F1: %f" % f_nocall(th))
+    
+    
 
 def make_submission(
     candidate_df:pd.DataFrame,
     prob_df:pd.DataFrame,
     num_kfolds:int,
     th:float,
+    nocall_th:float,
     weights_filepath_dict:dict,
     max_distance:int
 ):
@@ -270,7 +331,10 @@ def make_submission(
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
     y_preda = np.mean(y_preda_list, axis=0)
-    _gdf = candidate_df[y_preda > th].groupby(
+    candidate_df["y_preda"] = y_preda
+    
+    _df = candidate_df[y_preda > th]
+    _gdf = _df.groupby(
         ["audio_id", "seconds"],
         as_index=False
     )["label"].apply(
@@ -279,11 +343,11 @@ def make_submission(
         "label": "predictions"
     })
     submission_df = pd.merge(
-        prob_df[["row_id", "audio_id", "seconds", "birds", "site", "month"]],
-        _gdf,
-        how="left",
-        on=["audio_id", "seconds"]
-    )
+            prob_df[["row_id", "audio_id", "seconds", "birds"]],
+            _gdf,
+            how="left",
+            on=["audio_id", "seconds"]
+        )
     submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
     if TARGET_PATH:
         score_df = pd.DataFrame(
@@ -293,12 +357,42 @@ def make_submission(
             ).tolist()
         )
         print("-" * 30)
-        print("BEFORE(ルールベースのフィルタリングを掛ける前)")
+        print("BEFORE(nocall injection 前)")
         print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
         print("上のピン📌と一致するか確認")
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
         print("Precision: %.4f" % score_df["prec"].mean())
+        
+    # nocall injection
+    _gdf2 = _df.groupby(
+            ["audio_id", "seconds"],
+            as_index=False
+    )["y_preda"].sum()
+    submission_df = pd.merge(
+            submission_df,
+            _gdf2,
+            how="left",
+            on=["audio_id", "seconds"]
+        )
+    submission_df.loc[(submission_df["y_preda"] < nocall_th) 
+                     & (submission_df["predictions"]!="nocall"), "predictions"] += " nocall"
+    if TARGET_PATH:
+        score_df = pd.DataFrame(
+            submission_df.apply(
+                lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"]),
+                axis=1
+            ).tolist()
+        )
+        print("-" * 30)
+        print("AFTER(nocall injection 後)")
+        print("図鑑で学習済みモデルでのCVスコア(モデルの動作確認用)")
+        print("上のピン📌と一致するか確認")
+        print("F1: %.4f" % score_df["f1"].mean())
+        print("Recall: %.4f" % score_df["rec"].mean())
+        print("Precision: %.4f" % score_df["prec"].mean())
+        
+            
     return submission_df[["row_id", "predictions"]].rename(columns={
         "predictions": "birds"
     })
@@ -456,6 +550,7 @@ def run(training_config, config, prob_df, model_dict):
         prob_df,
         num_kfolds=config.num_kfolds,
         th=config.threshold,
+        nocall_th=config.nocall_threshold,
         weights_filepath_dict=config.weights_filepath_dict,
         max_distance=config.max_distance
     )
