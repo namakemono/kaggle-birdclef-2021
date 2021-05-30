@@ -19,6 +19,7 @@ from torch import nn
 from  torch.utils.data import Dataset, DataLoader
 from resnest.torch import resnest50
 
+
 import bird_recognition
 
 NUM_CLASSES = 397
@@ -210,7 +211,10 @@ def optimize(
         for mode in weights_filepath_dict.keys():
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32))
+                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+            elif mode=='lgbm_rank':
+                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = (y_preda-y_preda.min())/(y_preda.max()-y_preda.min())
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
@@ -326,7 +330,10 @@ def make_submission(
         for mode in weights_filepath_dict.keys():
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32))
+                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+            elif mode=='lgbm_rank':
+                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = (y_preda-y_preda.min())/(y_preda.max()-y_preda.min())
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             y_preda_list.append(y_preda)
@@ -407,10 +414,10 @@ def get_prob_df(config, audio_paths):
 
     for checkpoint_path in config.checkpoint_paths:
         prob_filepath = config.get_prob_filepath_from_checkpoint(checkpoint_path)
-        if True:
+        if (not os.path.exists(prob_filepath)) or (TARGET_PATH is None):  # キャッシュがない or 提出時は必ず計算
             nets = [load_net(checkpoint_path.as_posix())]
             pred_probas = predict(nets, test_data, names=False)
-            if TARGET_PATH: # 手元
+            if TARGET_PATH: # 手元                
                 df = pd.read_csv(TARGET_PATH, usecols=["row_id", "birds"])
             else: # 提出時
                 if str(audio_paths)=="../input/birdclef-2021/train_soundscapes":
@@ -509,6 +516,7 @@ def run(training_config, config, prob_df, model_dict):
             candidate_df_soundscapes,
             prob_df_soundscapes,
             num_kfolds=training_config.num_kfolds,
+            num_candidates=training_config.num_candidates,
             weight_rate=training_config.weight_rate,
             verbose=True,
             xgb_params=training_config.xgb_params,
@@ -535,7 +543,6 @@ def run(training_config, config, prob_df, model_dict):
         prob_df,
         max_distance=config.max_distance
     )
-
     
     if TARGET_PATH:
         optimize(
