@@ -297,7 +297,8 @@ def optimize(
     def f_nocall(nocall_th):
         submission_df_with_nocall = submission_df.copy()
         submission_df_with_nocall.loc[(submission_df_with_nocall["y_preda"]<nocall_th) 
-                                      & (submission_df_with_nocall["predictions"]!="nocall"), "predictions"] += " nocall"
+                                      & (submission_df_with_nocall["predictions"]!="nocall")
+                                       & (submission_df_with_nocall["birds"].str.split().str.len()==1), "predictions"] += " nocall"
         return submission_df_with_nocall.apply(
             lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
             axis=1
@@ -391,7 +392,8 @@ def make_submission(
             on=["audio_id", "seconds"]
         )
     submission_df.loc[(submission_df["y_preda"] < nocall_th) 
-                     & (submission_df["predictions"]!="nocall"), "predictions"] += " nocall"
+                     & (submission_df["predictions"]!="nocall")
+                      & (submission_df["birds"].str.split().str.len()==1), "predictions"] += " nocall"
     if TARGET_PATH:
         score_df = pd.DataFrame(
             submission_df.apply(
