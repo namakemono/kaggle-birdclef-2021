@@ -489,6 +489,22 @@ def run(training_config, config, prob_df, model_dict):
         print("before: %d" % len(prob_df))
         prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
         print("after: %d" % len(prob_df))
+
+    # 学習する必要のない項目を除外
+    # 図鑑の場合
+    if not "site" in prob_df.columns:
+        prob_df["site"] = prob_df.apply(
+            lambda row: bird_recognition.feature_extraction.to_site(
+                row,
+                max_distance=training_config.max_distance
+            ),
+            axis=1
+        )
+        print("[exclude other]before: %d" % len(prob_df))
+        prob_df = prob_df[prob_df["site"] != "Other"].reset_index(drop=True)
+        print("[exclude other]after: %d" % len(prob_df))
+
+
     candidate_df = bird_recognition.candidate_extraction.make_candidates(
         prob_df,
         num_spieces=training_config.num_spieces,
@@ -500,7 +516,7 @@ def run(training_config, config, prob_df, model_dict):
         prob_df,
         max_distance=training_config.max_distance
     )
-    
+   
     # soundscapes
     prob_df_soundscapes = bird_recognition.evaluation.get_prob_df(config,Path("../input/birdclef-2021/train_soundscapes"))
     candidate_df_soundscapes = bird_recognition.candidate_extraction.make_candidates(
