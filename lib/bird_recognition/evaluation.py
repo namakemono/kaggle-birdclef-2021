@@ -249,6 +249,12 @@ def optimize(
     num_kfolds:int,
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
 ):
+    nocall_prob_df = prob_df[prob_df["birds"] == "nocall"]
+    nocall_prob_df = nocall_prob_df.head(int(len(nocall_prob_df) * 0.68))
+    call_prob_df = prob_df[prob_df["birds"] != "nocall"]
+    prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
+    print("Nocall prob: %.4f" % (prob_df["birds"] == "nocall").mean())
+
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names]
     y_preda_list = []
