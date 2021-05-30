@@ -62,17 +62,17 @@ def train(
     for kfold_index, (_, valid_index) in enumerate(kf.split(candidate_df[feature_names].values, candidate_df["target"].values, groups)):
         candidate_df.loc[valid_index, "fold"] = kfold_index
                         
-    X = candidate_df[feature_names].values
-    y = candidate_df["target"].values
+    X = candidate_df[feature_names]
+    y = candidate_df["target"]
     oofa = np.zeros(len(candidate_df_soundscapes), dtype=np.float32)
     
     for kfold_index in range(num_kfolds):
         print(f"fold {kfold_index}")
         train_index = candidate_df[candidate_df["fold"] != kfold_index].index
         valid_index = candidate_df[candidate_df["fold"] == kfold_index].index
-        X_train, y_train = X[train_index], y[train_index]
+        X_train, y_train = X.loc[train_index], y.loc[train_index]
         #X_valid, y_valid = X[valid_index], y[valid_index]
-        X_valid, y_valid = candidate_df_soundscapes[feature_names].values, candidate_df_soundscapes["target"].values
+        X_valid, y_valid = candidate_df_soundscapes[feature_names], candidate_df_soundscapes["target"]
         '''
         #----------------------------------------------------------------------
         if mode=='lgbm' or mode=='cat':
@@ -106,12 +106,13 @@ def train(
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
 
         elif mode=='cat':
-            train_pool = Pool(X_train, label=y_train)
-            valid_pool = Pool(X_valid, label=y_valid)
+            train_pool = Pool(X_train, label=y_train, cat_features=["bird_id"])
+            valid_pool = Pool(X_valid, label=y_valid, cat_features=["bird_id"])
             model = CatBoostClassifier(
                 loss_function='Logloss',
                 task_type='GPU',
                 random_seed=random_state,    
+                cat_features=["bird_id"],
             )
             model.fit(train_pool, eval_set=[valid_pool], use_best_model=True, verbose=100)
             oofa+= model.predict_proba(valid_pool)[:,1]/num_kfolds
