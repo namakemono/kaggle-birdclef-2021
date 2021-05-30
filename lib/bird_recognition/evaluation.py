@@ -391,8 +391,7 @@ def make_submission(
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
         print("Precision: %.4f" % score_df["prec"].mean())
-        
-            
+                
     return submission_df[["row_id", "predictions"]].rename(columns={
         "predictions": "birds"
     })
@@ -408,13 +407,18 @@ def get_prob_df(config, audio_paths):
 
     for checkpoint_path in config.checkpoint_paths:
         prob_filepath = config.get_prob_filepath_from_checkpoint(checkpoint_path)
-        if not os.path.exists(prob_filepath):
+        if True:
             nets = [load_net(checkpoint_path.as_posix())]
             pred_probas = predict(nets, test_data, names=False)
-            if TARGET_PATH:
+            if TARGET_PATH: # 手元
                 df = pd.read_csv(TARGET_PATH, usecols=["row_id", "birds"])
-            else:
-                df = pd.read_csv(SAMPLE_SUB_PATH, usecols=["row_id", "birds"])
+            else: # 提出時
+                if str(audio_paths)=="../input/birdclef-2021/train_soundscapes":
+                    print(audio_paths)
+                    df = pd.read_csv(Path("../input/birdclef-2021/train_soundscape_labels.csv"), usecols=["row_id", "birds"])
+                else:
+                    print(SAMPLE_SUB_PATH)
+                    df = pd.read_csv(SAMPLE_SUB_PATH, usecols=["row_id", "birds"])
             df["audio_id"] = df["row_id"].apply(lambda _: int(_.split("_")[0]))
             df["site"] = df["row_id"].apply(lambda _: _.split("_")[1])
             df["seconds"] = df["row_id"].apply(lambda _: int(_.split("_")[2]))
