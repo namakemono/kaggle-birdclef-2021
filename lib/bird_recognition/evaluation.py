@@ -20,6 +20,7 @@ from  torch.utils.data import Dataset, DataLoader
 from resnest.torch import resnest50
 import timm
 
+
 import bird_recognition
 
 NUM_CLASSES = 397
@@ -249,16 +250,23 @@ def optimize(
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
-    X = candidate_df[feature_names].values
+    X = candidate_df[feature_names]
     y_preda_list = []
-    for kfold_index in range(num_kfolds):
-        for mode in weights_filepath_dict.keys():
+    for mode in weights_filepath_dict.keys():
+        fold_y_preda_list = []
+        for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32))
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
+            elif mode=='lgbm_rank':
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             else:
                 y_preda = clf.predict_proba(X)[:,1]
-            y_preda_list.append(y_preda)
+            fold_y_preda_list.append(y_preda)
+        mean_preda = np.mean(fold_y_preda_list, axis=0)
+        if mode=='lgbm_rank': # スケーリング
+            mean_preda = 1/(1 + np.exp(-mean_preda))
+        y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
@@ -365,16 +373,23 @@ def make_submission(
     max_distance:int
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
-    X = candidate_df[feature_names].values
+    X = candidate_df[feature_names]
     y_preda_list = []
-    for kfold_index in range(num_kfolds):
-        for mode in weights_filepath_dict.keys():
+    for mode in weights_filepath_dict.keys():
+        fold_y_preda_list = []
+        for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32))
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
+            elif mode=='lgbm_rank':
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             else:
                 y_preda = clf.predict_proba(X)[:,1]
-            y_preda_list.append(y_preda)
+            fold_y_preda_list.append(y_preda)
+        mean_preda = np.mean(fold_y_preda_list, axis=0)
+        if mode=='lgbm_rank':  # スケーリング
+            mean_preda = 1/(1 + np.exp(-mean_preda))
+        y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
@@ -436,8 +451,7 @@ def make_submission(
         print("F1: %.4f" % score_df["f1"].mean())
         print("Recall: %.4f" % score_df["rec"].mean())
         print("Precision: %.4f" % score_df["prec"].mean())
-        
-            
+                
     return submission_df[["row_id", "predictions"]].rename(columns={
         "predictions": "birds"
     })
@@ -453,13 +467,18 @@ def get_prob_df(config, audio_paths):
 
     for checkpoint_path in config.checkpoint_paths:
         prob_filepath = config.get_prob_filepath_from_checkpoint(checkpoint_path)
-        if not os.path.exists(prob_filepath):
+        if (not os.path.exists(prob_filepath)) or (TARGET_PATH is None):  # キャッシュがない or 提出時は必ず計算
             nets = [load_net(checkpoint_path.as_posix())]
             pred_probas = predict(nets, test_data, names=False)
-            if TARGET_PATH:
+            if TARGET_PATH: # 手元                
                 df = pd.read_csv(TARGET_PATH, usecols=["row_id", "birds"])
-            else:
-                df = pd.read_csv(SAMPLE_SUB_PATH, usecols=["row_id", "birds"])
+            else: # 提出時
+                if str(audio_paths)=="../input/birdclef-2021/train_soundscapes":
+                    print(audio_paths)
+                    df = pd.read_csv(Path("../input/birdclef-2021/train_soundscape_labels.csv"), usecols=["row_id", "birds"])
+                else:
+                    print(SAMPLE_SUB_PATH)
+                    df = pd.read_csv(SAMPLE_SUB_PATH, usecols=["row_id", "birds"])
             df["audio_id"] = df["row_id"].apply(lambda _: int(_.split("_")[0]))
             df["site"] = df["row_id"].apply(lambda _: _.split("_")[1])
             df["seconds"] = df["row_id"].apply(lambda _: int(_.split("_")[2]))
@@ -515,6 +534,22 @@ def run(training_config, config, prob_df, model_dict):
         print("before: %d" % len(prob_df))
         prob_df = prob_df[prob_df["rating"] >= 3.0].reset_index(drop=True)
         print("after: %d" % len(prob_df))
+
+    # 学習する必要のない項目を除外
+    # 図鑑の場合
+    if not "site" in prob_df.columns:
+        prob_df["site"] = prob_df.apply(
+            lambda row: bird_recognition.feature_extraction.to_site(
+                row,
+                max_distance=training_config.max_distance
+            ),
+            axis=1
+        )
+        print("[exclude other]before: %d" % len(prob_df))
+        prob_df = prob_df[prob_df["site"] != "Other"].reset_index(drop=True)
+        print("[exclude other]after: %d" % len(prob_df))
+
+
     candidate_df = bird_recognition.candidate_extraction.make_candidates(
         prob_df,
         num_spieces=training_config.num_spieces,
@@ -526,7 +561,7 @@ def run(training_config, config, prob_df, model_dict):
         prob_df,
         max_distance=training_config.max_distance
     )
-    
+   
     # soundscapes
     prob_df_soundscapes = bird_recognition.evaluation.get_prob_df(config,Path("../input/birdclef-2021/train_soundscapes"))
     candidate_df_soundscapes = bird_recognition.candidate_extraction.make_candidates(
@@ -550,6 +585,7 @@ def run(training_config, config, prob_df, model_dict):
             candidate_df_soundscapes,
             prob_df_soundscapes,
             num_kfolds=training_config.num_kfolds,
+            num_candidates=training_config.num_candidates,
             weight_rate=training_config.weight_rate,
             verbose=True,
             xgb_params=training_config.xgb_params,
@@ -576,7 +612,6 @@ def run(training_config, config, prob_df, model_dict):
         prob_df,
         max_distance=config.max_distance
     )
-
     
     if TARGET_PATH:
         optimize(

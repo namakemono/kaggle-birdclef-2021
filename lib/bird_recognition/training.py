@@ -12,7 +12,6 @@ from catboost import CatBoostClassifier
 from catboost import Pool
 from imblearn.over_sampling import RandomOverSampler
 import lightgbm as lgb
-
 import os
 import random
 
@@ -30,18 +29,20 @@ def seed_everything(seed=1234):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     
+
 def train(
     candidate_df:pd.DataFrame,
     df:pd.DataFrame,
     candidate_df_soundscapes:pd.DataFrame,
     df_soundscapes:pd.DataFrame,
     num_kfolds:int,
+    num_candidates:int,
     weight_rate:float=1.0,
     xgb_params:dict=None,
     verbose:bool=False,
     mode=None,
     sampling_strategy:float=1.0,
-    random_state:int=777
+    random_state:int=777,
 ):
     seed_everything(random_state)
     
@@ -57,22 +58,21 @@ def train(
         
     # short audio の  k fold
     groups = candidate_df["audio_id"]
-    kf = StratifiedGroupKFold(n_splits=num_kfolds)
+    kf = StratifiedGroupKFold(n_splits=num_kfolds) # lgbm_rankを使う場合は、groupごとにくっつけたデータを使う必要があるのでシャッフルしない
     for kfold_index, (_, valid_index) in enumerate(kf.split(candidate_df[feature_names].values, candidate_df["target"].values, groups)):
         candidate_df.loc[valid_index, "fold"] = kfold_index
                         
-    X = candidate_df[feature_names].values
-    y = candidate_df["target"].values
+    X = candidate_df[feature_names]
+    y = candidate_df["target"]
     oofa = np.zeros(len(candidate_df_soundscapes), dtype=np.float32)
     
     for kfold_index in range(num_kfolds):
         print(f"fold {kfold_index}")
         train_index = candidate_df[candidate_df["fold"] != kfold_index].index
         valid_index = candidate_df[candidate_df["fold"] == kfold_index].index
-        X_train, y_train = X[train_index], y[train_index]
+        X_train, y_train = X.loc[train_index], y.loc[train_index]
         #X_valid, y_valid = X[valid_index], y[valid_index]
-        X_valid, y_valid = candidate_df_soundscapes[feature_names].values, candidate_df_soundscapes["target"].values
-
+        X_valid, y_valid = candidate_df_soundscapes[feature_names], candidate_df_soundscapes["target"]
         '''
         #----------------------------------------------------------------------
         if mode=='lgbm' or mode=='cat':
@@ -106,12 +106,13 @@ def train(
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
 
         elif mode=='cat':
-            train_pool = Pool(X_train, label=y_train)
-            valid_pool = Pool(X_valid, label=y_valid)
+            train_pool = Pool(X_train, label=y_train, cat_features=["bird_id"])
+            valid_pool = Pool(X_valid, label=y_valid, cat_features=["bird_id"])
             model = CatBoostClassifier(
                 loss_function='Logloss',
                 task_type='GPU',
                 random_seed=random_state,    
+                cat_features=["bird_id"],
             )
             model.fit(train_pool, eval_set=[valid_pool], use_best_model=True, verbose=100)
             oofa+= model.predict_proba(valid_pool)[:,1]/num_kfolds
@@ -141,6 +142,31 @@ def train(
             oofa+= clf.predict_proba(X_valid)[:,1]/num_kfolds
         #----------------------------------------------------------------------
 
+        if mode=='lgbm_rank':
+            lgbm_params = {
+                'objective': 'lambdarank',
+                'metric': 'ndcg',
+                'ndcg_eval_at': [3, 5],
+                'boosting_type': 'gbdt',
+            }
+            lgtrain = lgb.Dataset(X_train, y_train,  group=[num_candidates for i in range(len(y_train)//num_candidates)])
+            lgvalid = lgb.Dataset(X_valid, y_valid,  group=[num_candidates for i in range(len(y_valid)//num_candidates)])
+            lgbrank = lgb.train(
+                lgbm_params,
+                lgtrain,
+                num_boost_round=10,
+                valid_sets=[lgtrain, lgvalid],
+                valid_names=['train','valid'],
+                early_stopping_rounds=2,
+                verbose_eval=1
+            )
+            oofa += lgbrank.predict(X_valid, num_iteration=lgbrank.best_iteration)/num_kfolds
+            pickle.dump(lgbrank, open(f"lgbm_rank_{kfold_index}.pkl", "wb"))
+            
+    # 0-1 に標準化
+    if mode=='lgbm_rank':
+        oofa = 1/(1 + np.exp(-oofa))
+        
     def f(th):
         _df = candidate_df_soundscapes[(oofa > th)]
         if len(_df) == 0:
