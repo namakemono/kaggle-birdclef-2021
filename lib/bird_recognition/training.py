@@ -86,7 +86,7 @@ def train(
                 X_train, y_train = ros.fit_resample(X_train, y_train)
                 print("Resampled. positive ratio: %.4f" % np.mean(y_train))
         '''
-        if mode=='lgbm':            
+        if mode=='lgbm':
             dtrain = lgb.Dataset(X_train, label=y_train, weight = candidate_df.loc[train_index, "weight"].values)
             dvalid = lgb.Dataset(X_valid, label=y_valid, weight = candidate_df_soundscapes["weight"].values)
             params = {
