@@ -249,8 +249,9 @@ def optimize(
     num_kfolds:int,
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
 ):
+    # train soundscape のnocall割合をtestと同じく54%に近づける
     nocall_prob_df = prob_df[prob_df["birds"] == "nocall"]
-    nocall_prob_df = nocall_prob_df.head(int(len(nocall_prob_df) * 0.68))
+    nocall_prob_df = nocall_prob_df.sample(int(len(nocall_prob_df) * 0.68), random_state=777)
     call_prob_df = prob_df[prob_df["birds"] != "nocall"]
     prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
     print("Nocall prob: %.4f" % (prob_df["birds"] == "nocall").mean())
