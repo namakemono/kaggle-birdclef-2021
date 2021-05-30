@@ -18,6 +18,7 @@ import torch
 from torch import nn
 from  torch.utils.data import Dataset, DataLoader
 from resnest.torch import resnest50
+import timm
 
 import bird_recognition
 
@@ -155,9 +156,53 @@ class BirdCLEFDataset(Dataset):
     def __getitem__(self, idx):
         return self.read_file(self.data.loc[idx, "filepath"])
 
+def add_tail(model, num_classes):
+    if hasattr(model, "fc"):
+        nb_ft = model.fc.in_features
+        model.fc = nn.Linear(nb_ft, num_classes)
+    elif hasattr(model, "_fc"):
+        nb_ft = model._fc.in_features
+        model._fc = nn.Linear(nb_ft, num_classes)
+    elif hasattr(model, "classifier"):
+        nb_ft = model.classifier.in_features
+        model.classifier = nn.Linear(nb_ft, num_classes)
+    elif hasattr(model, "last_linear"):
+        nb_ft = model.last_linear.in_features
+        model.last_linear = nn.Linear(nb_ft, num_classes)
+    return model
+
 def load_net(checkpoint_path, num_classes=NUM_CLASSES):
-    net = resnest50(pretrained=False)
-    net.fc = nn.Linear(net.fc.in_features, num_classes)
+    if "resnest50" in checkpoint_path:
+        net = resnest50(pretrained=False)
+    elif "resnext101_32x8d_wsl" in checkpoint_path:
+        net = torch.hub.load("facebookresearch/WSL-Images", "resnext101_32x8d_wsl")
+    elif "resnest26d" in checkpoint_path:
+        net = getattr(timm.models.resnest, "resnest26d")(pretrained=False)
+    elif "tf_efficientnetv2_s" in checkpoint_path:
+        net = getattr(timm.models.efficientnet, "tf_efficientnetv2_s")(pretrained=False)
+    elif "tf_efficientnetv2_b0" in checkpoint_path:
+        net = getattr(timm.models.efficientnet, "tf_efficientnetv2_b0")(pretrained=False)
+    elif "tf_efficientnet_b0" in checkpoint_path:
+        net = getattr(timm.models.efficientnet, "tf_efficientnet_b0")(pretrained=False)
+    else:
+        raise ValueError("Unexpected checkpont name: %s" % checkpoint_path)
+
+    if hasattr(net, "fc"):
+        nb_ft = net.fc.in_features
+        net.fc = nn.Linear(nb_ft, num_classes)
+    elif hasattr(net, "_fc"):
+        nb_ft = net._fc.in_features
+        net._fc = nn.Linear(nb_ft, num_classes)
+    elif hasattr(net, "classifier"):
+        nb_ft = net.classifier.in_features
+        net.classifier = nn.Linear(nb_ft, num_classes)
+    elif hasattr(net, "last_linear"):
+        nb_ft = net.last_linear.in_features
+        net.last_linear = nn.Linear(nb_ft, num_classes)
+
+    # net.fc = nn.Linear(net.fc.in_features, num_classes)
+    net = add_tail(net, num_classes)
+
     dummy_device = torch.device("cpu")
     d = torch.load(checkpoint_path, map_location=dummy_device)
     for key in list(d.keys()):
