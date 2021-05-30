@@ -220,7 +220,7 @@ def optimize(
             fold_y_preda_list.append(y_preda)
         mean_preda = np.mean(fold_y_preda_list, axis=0)
         if mode=='lgbm_rank': # スケーリング
-            mean_preda = (mean_preda-mean_preda.min())/(mean_preda.max()-mean_preda.min())
+            mean_preda = 1/(1 + np.exp(-mean_preda))
         y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
@@ -343,7 +343,7 @@ def make_submission(
             fold_y_preda_list.append(y_preda)
         mean_preda = np.mean(fold_y_preda_list, axis=0)
         if mode=='lgbm_rank':  # スケーリング
-            mean_preda = (mean_preda-mean_preda.min())/(mean_preda.max()-mean_preda.min())
+            mean_preda = 1/(1 + np.exp(-mean_preda))
         y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda

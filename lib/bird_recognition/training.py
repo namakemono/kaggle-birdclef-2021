@@ -164,7 +164,7 @@ def train(
             
     # 0-1 に標準化
     if mode=='lgbm_rank':
-        oofa = (oofa-oofa.min())/(oofa.max()-oofa.min())
+        oofa = 1/(1 + np.exp(-oofa))
         
     def f(th):
         _df = candidate_df_soundscapes[(oofa > th)]
