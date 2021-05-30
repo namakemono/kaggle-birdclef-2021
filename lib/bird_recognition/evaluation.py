@@ -205,16 +205,16 @@ def optimize(
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
-    X = candidate_df[feature_names].values
+    X = candidate_df[feature_names]
     y_preda_list = []
     for mode in weights_filepath_dict.keys():
         fold_y_preda_list = []
         for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             elif mode=='lgbm_rank':
-                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             fold_y_preda_list.append(y_preda)
@@ -328,16 +328,16 @@ def make_submission(
     max_distance:int
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
-    X = candidate_df[feature_names].values
+    X = candidate_df[feature_names]
     y_preda_list = []
     for mode in weights_filepath_dict.keys():
         fold_y_preda_list = []
         for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
-                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             elif mode=='lgbm_rank':
-                y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
+                y_preda = clf.predict(X, num_iteration=clf.best_iteration)
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             fold_y_preda_list.append(y_preda)
