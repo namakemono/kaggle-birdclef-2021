@@ -207,17 +207,21 @@ def optimize(
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
-    for kfold_index in range(num_kfolds):
-        for mode in weights_filepath_dict.keys():
+    for mode in weights_filepath_dict.keys():
+        fold_y_preda_list = []
+        for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
                 y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
             elif mode=='lgbm_rank':
                 y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
-                y_preda = (y_preda-y_preda.min())/(y_preda.max()-y_preda.min())
             else:
                 y_preda = clf.predict_proba(X)[:,1]
-            y_preda_list.append(y_preda)
+            fold_y_preda_list.append(y_preda)
+        mean_preda = np.mean(fold_y_preda_list, axis=0)
+        if mode=='lgbm_rank': # スケーリング
+            mean_preda = (mean_preda-mean_preda.min())/(mean_preda.max()-mean_preda.min())
+        y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
@@ -326,17 +330,21 @@ def make_submission(
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names].values
     y_preda_list = []
-    for kfold_index in range(num_kfolds):
-        for mode in weights_filepath_dict.keys():
+    for mode in weights_filepath_dict.keys():
+        fold_y_preda_list = []
+        for kfold_index in range(num_kfolds):
             clf = pickle.load(open(weights_filepath_dict[mode][kfold_index], "rb"))
             if mode=='lgbm':
                 y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
             elif mode=='lgbm_rank':
                 y_preda = clf.predict(X.astype(np.float32), num_iteration=clf.best_iteration)
-                y_preda = (y_preda-y_preda.min())/(y_preda.max()-y_preda.min())
             else:
                 y_preda = clf.predict_proba(X)[:,1]
-            y_preda_list.append(y_preda)
+            fold_y_preda_list.append(y_preda)
+        mean_preda = np.mean(fold_y_preda_list, axis=0)
+        if mode=='lgbm_rank':  # スケーリング
+            mean_preda = (mean_preda-mean_preda.min())/(mean_preda.max()-mean_preda.min())
+        y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
