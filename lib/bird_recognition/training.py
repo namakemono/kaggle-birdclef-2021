@@ -92,7 +92,6 @@ def train(
         }
         sampling_strategy = cat_params["sampling_strategy"]
         cat_params.pop("sampling_strategy")
-        print("cat_params", cat_params)
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
@@ -151,7 +150,7 @@ def train(
 
         elif mode=='xgb':
             # 正例の重みを weight_rate, 負例を1にする
-            print("cat_params", xgb_params)
+            print("xgb_params", xgb_params)
             sample_weight = np.ones(y_train.shape)
             sample_weight[y_train==1] = weight_rate
             sample_weight_val = np.ones(y_valid.shape)
