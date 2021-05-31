@@ -248,13 +248,8 @@ def optimize(
     prob_df:pd.DataFrame,
     num_kfolds:int,
     weights_filepath_dict:dict, #example: {'lgbm':['filepath1', 'filepath2'], 'xgb':['filepath1', 'filepath2']}
+    num_candidates:int,
 ):
-    # train soundscape のnocall割合をtestと同じく54%に近づける
-    nocall_prob_df = prob_df[prob_df["birds"] == "nocall"]
-    nocall_prob_df = nocall_prob_df.sample(int(len(nocall_prob_df) * 0.68), random_state=777)
-    call_prob_df = prob_df[prob_df["birds"] != "nocall"]
-    prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
-    print("Nocall prob: %.4f" % (prob_df["birds"] == "nocall").mean())
 
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names]
@@ -277,98 +272,110 @@ def optimize(
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
-    def f(th):
-        _df = candidate_df[y_preda > th]
-        if len(_df) == 0:
-            return 0
-        _gdf = _df.groupby(
-            ["audio_id", "seconds"],
-            as_index=False
-        )["label"].apply(
-            lambda _: " ".join(_)
-        ).rename(columns={
-            "label": "predictions"
-        })
-        submission_df = pd.merge(
-            prob_df[["row_id", "audio_id", "seconds", "birds"]],
-            _gdf,
-            how="left",
-            on=["audio_id", "seconds"]
-        )
-        submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
-        return submission_df.apply(
-            lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
-            axis=1
-        ).mean()
-    
-    lb, ub = 0, 1
-    for k in range(30):
-        th1 = (lb * 2 + ub) / 3
-        th2 = (lb + ub * 2) / 3
-        if f(th1) < f(th2):
-            lb = th1
-        else:
-            ub = th2
-    th = (lb + ub) / 2
-    print("-" * 30)
-    print("## 下記の閾値をメモして，動作確認時にモデル動作確認用のF1値と一致していることを確認")
-    print("📌best threshold: %f" % th)
-    print("best F1: %f" % f(th))
-    
-    # nocall injection
-    _df = candidate_df[y_preda > th]
-    if len(_df) == 0:
-        return 0
-    _gdf = _df.groupby(
-            ["audio_id", "seconds"],
-            as_index=False
-    )["label"].apply(
-        lambda _: " ".join(_)
-    ).rename(columns={
-        "label": "predictions"
-    })
-    submission_df = pd.merge(
-            prob_df[["row_id", "audio_id", "seconds", "birds"]],
-            _gdf,
-            how="left",
-            on=["audio_id", "seconds"]
-        )
-    submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
 
+    # train soundscape のnocall割合変更
+    candidate_df=candidate_df.sort_values(["row_id", "y_preda"], ascending=False).reset_index(drop=True) # groupごとに確率値を降順にソート
+    print("## 0.544時の閾値をメモ")
     
-    _gdf2 = _df.groupby(
-            ["audio_id", "seconds"],
-            as_index=False
-    )["y_preda"].sum()
-    submission_df = pd.merge(
-            submission_df,
-            _gdf2,
-            how="left",
-            on=["audio_id", "seconds"]
-        )
-    def f_nocall(nocall_th):
-        submission_df_with_nocall = submission_df.copy()
-        submission_df_with_nocall.loc[(submission_df_with_nocall["y_preda"]<nocall_th) 
-                                      & (submission_df_with_nocall["predictions"]!="nocall"), "predictions"] += " nocall"
-        return submission_df_with_nocall.apply(
-            lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
-            axis=1
-        ).mean()
-    lb, ub = 0, 1
-    for k in range(30):
-        th1 = (lb * 2 + ub) / 3
-        th2 = (lb + ub * 2) / 3
-        if f_nocall(th1) < f_nocall(th2):
-            lb = th1
-        else:
-            ub = th2
-    th = (lb + ub) / 2
-    print("-" * 30)
-    print("## nocall injection")
-    print("📌best nocall threshold: %f" % th)
-    print("best F1: %f" % f_nocall(th))
-    
-    
+    for nocall_ratio in [0.64, 0.59, 0.544]:
+        call_prob_df = prob_df[prob_df["birds"] != "nocall"]
+        nocall_num = int(len(call_prob_df)/((1/nocall_ratio)-1))
+        nocall_prob_df = prob_df[prob_df["birds"] == "nocall"]
+        nocall_prob_df = nocall_prob_df.sample(min(int(nocall_num), len(nocall_prob_df)), random_state=777)
+        new_prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
+        print("-" * 30)
+        print("Nocall prob: %.4f" % (new_prob_df["birds"] == "nocall").mean(), f" call:{len(call_prob_df)}  nocall:{nocall_num}")
+        print("-" * 30)        
+        for max_bird_num in range(1, 5+1): # 最大５つの鳥まで
+            print(f"max bird num: {max_bird_num}")
+            def f(th):                
+                _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)] # 上位n件の鳥で一定確率以上のもの
+                if len(_df) == 0:
+                    return 0
+                _gdf = _df.groupby(
+                        ["audio_id", "seconds"],
+                        as_index=False
+                        )["label"].apply(
+                            lambda _: " ".join(_)
+                        ).rename(columns={
+                            "label": "predictions"
+                        })
+                submission_df = pd.merge(
+                    new_prob_df[["row_id", "audio_id", "seconds", "birds"]],
+                    _gdf,
+                    how="left",
+                    on=["audio_id", "seconds"]
+                )
+                submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
+                return submission_df.apply(
+                    lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
+                    axis=1
+                ).mean()
+
+            lb, ub = 0, 1
+            for k in range(30):
+                th1 = (lb * 2 + ub) / 3
+                th2 = (lb + ub * 2) / 3
+                if f(th1) < f(th2):
+                    lb = th1
+                else:
+                    ub = th2
+            th = (lb + ub) / 2
+            print("#Before")
+            print(" 📌best threshold: %f" % th)
+            print("  best F1: %f" % f(th))
+
+
+            # nocall injection
+            _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)]
+            if len(_df) == 0:
+                return 0
+            _gdf = _df.groupby(
+                        ["audio_id", "seconds"],
+                        as_index=False
+                )["label"].apply(
+                    lambda _: " ".join(_)
+                ).rename(columns={
+                    "label": "predictions"
+                })
+            submission_df = pd.merge(
+                        new_prob_df[["row_id", "audio_id", "seconds", "birds"]],
+                        _gdf,
+                        how="left",
+                        on=["audio_id", "seconds"]
+                    )
+            submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
+            _gdf2 = _df.groupby(
+                        ["audio_id", "seconds"],
+                        as_index=False
+                )["y_preda"].sum()
+            submission_df = pd.merge(
+                        submission_df,
+                        _gdf2,
+                        how="left",
+                        on=["audio_id", "seconds"]
+                    )    
+            def f_nocall(nocall_th):
+                submission_df_with_nocall = submission_df.copy()
+                submission_df_with_nocall.loc[(submission_df_with_nocall["y_preda"]<nocall_th) 
+                                                  & (submission_df_with_nocall["predictions"]!="nocall"), "predictions"] += " nocall"
+                return submission_df_with_nocall.apply(
+                        lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
+                        axis=1
+                ).mean()
+            lb, ub = 0, 1
+            for k in range(30):
+                th1 = (lb * 2 + ub) / 3
+                th2 = (lb + ub * 2) / 3
+                if f_nocall(th1) < f_nocall(th2):
+                    lb = th1
+                else:
+                    ub = th2
+            th = (lb + ub) / 2
+            print("#After (nocall injection)")
+            print(" 📌best nocall threshold: %f" % th)
+            print("  best F1: %f" % f_nocall(th))    
+            print()    
 
 def make_submission(
     candidate_df:pd.DataFrame,
@@ -377,7 +384,9 @@ def make_submission(
     th:float,
     nocall_th:float,
     weights_filepath_dict:dict,
-    max_distance:int
+    max_distance:int,
+    max_bird_num:int,
+    num_candidates:int,
 ):
     feature_names = bird_recognition.feature_extraction.get_feature_names()
     X = candidate_df[feature_names]
@@ -400,7 +409,23 @@ def make_submission(
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
     
-    _df = candidate_df[y_preda > th]
+    
+    if TARGET_PATH:
+        nocall_ratio = 0.544
+        call_prob_df = prob_df[prob_df["birds"] != "nocall"]
+        nocall_num = int(len(call_prob_df)/((1/nocall_ratio)-1))
+        nocall_prob_df = prob_df[prob_df["birds"] == "nocall"]
+        nocall_prob_df = nocall_prob_df.sample(min(int(nocall_num), len(nocall_prob_df)), random_state=777)
+        prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
+        print("-" * 30)
+        print("Nocall prob: %.4f" % (prob_df["birds"] == "nocall").mean(), f" call:{len(call_prob_df)}  nocall:{nocall_num}")
+      
+        
+    print("-" * 30)
+    print(f"thresh:{th}, max_bird_num:{max_bird_num}, nocall_thresh:{nocall_th}")
+        
+    candidate_df=candidate_df.sort_values(["row_id", "y_preda"], ascending=False).reset_index(drop=True)
+    _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)]
     _gdf = _df.groupby(
         ["audio_id", "seconds"],
         as_index=False
@@ -626,12 +651,14 @@ def run(training_config, config, prob_df, model_dict):
             prob_df,
             num_kfolds=config.num_kfolds,
             weights_filepath_dict=config.weights_filepath_dict,
+            num_candidates=config.num_candidates,
         )
     if config.check_baseline:
         print("-" * 30)
         print("閾値でバサッと切ったCVスコア(参考値)")
         bird_recognition.baseline.calc_baseline(prob_df)
-
+        print()
+        
     submission_df = make_submission(
         candidate_df,
         prob_df,
@@ -639,7 +666,9 @@ def run(training_config, config, prob_df, model_dict):
         th=config.threshold,
         nocall_th=config.nocall_threshold,
         weights_filepath_dict=config.weights_filepath_dict,
-        max_distance=config.max_distance
+        max_distance=config.max_distance,
+        max_bird_num=config.max_bird_num,
+        num_candidates=config.num_candidates,
     )
     return submission_df
 
