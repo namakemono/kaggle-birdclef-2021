@@ -620,7 +620,9 @@ def run(training_config, config, prob_df, model_dict):
             num_candidates=training_config.num_candidates,
             weight_rate=training_config.weight_rate,
             verbose=True,
-            xgb_params=training_config.xgb_params,
+            xgb_params=getattr(training_config, "xgb_params", None),
+            lgb_params=getattr(training_config, "lgb_params", None),
+            cat_params=getattr(training_config, "cat_params", None),
             mode=mode,
         )
 
