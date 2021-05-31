@@ -72,8 +72,6 @@ def train(
             'bagging_freq': 3,
             'min_child_samples': 14
         }
-        sampling_strategy = lgb_params['sampling_strategy']
-        lgb_params.pop("sampling_strategy")
     if cat_params is None:
         cat_params = {
             "loss_function": 'Logloss',
@@ -90,8 +88,6 @@ def train(
             'od_wait': 37,
             'l2_leaf_reg': 11
         }
-        sampling_strategy = cat_params["sampling_strategy"]
-        cat_params.pop("sampling_strategy")
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
@@ -115,6 +111,12 @@ def train(
         X_valid, y_valid = candidate_df_soundscapes[feature_names], candidate_df_soundscapes["target"]
         #----------------------------------------------------------------------
         if mode=='lgbm' or mode=='cat':
+            if (mode == "lgbm") and ("sampling_strategy" in lgb_params):
+                sampling_strategy = lgb_params['sampling_strategy']
+                lgb_params.pop("sampling_strategy")
+            if (mode == "cat") and ("sampling_strategy" in cat_params):
+                sampling_strategy = cat_params['sampling_strategy']
+                cat_params.pop("sampling_strategy")
             if sampling_strategy is not None:
                 # 正例を10％まであげる
                 ros = RandomOverSampler(
