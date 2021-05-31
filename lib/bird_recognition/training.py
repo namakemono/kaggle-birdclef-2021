@@ -73,6 +73,7 @@ def train(
             'min_child_samples': 14
         }
         sampling_strategy = lgb_params['sampling_strategy']
+        lgb_params.pop("sampling_strategy")
     if cat_params is None:
         cat_params = {
             "loss_function": 'Logloss',
@@ -90,6 +91,8 @@ def train(
             'l2_leaf_reg': 11
         }
         sampling_strategy = cat_params["sampling_strategy"]
+        cat_params.pop("sampling_strategy")
+        print("cat_params", cat_params)
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
@@ -123,6 +126,7 @@ def train(
                 X_train, y_train = ros.fit_resample(X_train, y_train)
                 print("Resampled. positive ratio: %.4f" % np.mean(y_train))
         if mode=='lgbm':
+            print("lgb_params", lgb_params)
             dtrain = lgb.Dataset(X_train, label=y_train)
             dvalid = lgb.Dataset(X_valid, label=y_valid)
             model = lgb.train(
@@ -137,6 +141,7 @@ def train(
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
 
         elif mode=='cat':
+            print("cat_params", cat_params)
             train_pool = Pool(X_train, label=y_train, cat_features=["bird_id"])
             valid_pool = Pool(X_valid, label=y_valid, cat_features=["bird_id"])
             model = CatBoostClassifier(**cat_params)
@@ -146,6 +151,7 @@ def train(
 
         elif mode=='xgb':
             # 正例の重みを weight_rate, 負例を1にする
+            print("cat_params", xgb_params)
             sample_weight = np.ones(y_train.shape)
             sample_weight[y_train==1] = weight_rate
             sample_weight_val = np.ones(y_valid.shape)
