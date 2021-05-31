@@ -39,6 +39,8 @@ def train(
     num_candidates:int,
     weight_rate:float=1.0,
     xgb_params:dict=None,
+    lgb_params:dict=None,
+    cat_params:dict=None,
     verbose:bool=False,
     mode=None,
     sampling_strategy:float=1.0,
@@ -49,12 +51,50 @@ def train(
     if xgb_params is None:
         xgb_params = {
             "objective": "binary:logistic",
-            "tree_method": 'gpu_hist'
+            "tree_method": 'gpu_hist',
+            'eta': 0.0993377835502691,
+            'max_depth': 5,
+            'gamma': 0.0687888272344135,
+            'lambda': 1.2982042567554994,
+            'colsample_bytree': 0.6557114341349664
         }
+    if lgb_params is None:
+        lgb_params = {
+            'objective': 'binary',
+            'metric': 'binary_logloss',
+            'device':'gpu',
+            'sampling_strategy': 0.7390681439478531,
+            'lambda_l1': 0.03983513844141752,
+            'lambda_l2': 1.8694201294820176e-06,
+            'num_leaves': 233,
+            'feature_fraction': 0.9990617811904319,
+            'bagging_fraction': 0.45709720496406336,
+            'bagging_freq': 3,
+            'min_child_samples': 14
+        }
+        sampling_strategy = lgb_params['sampling_strategy']
+        lgb_params.pop("sampling_strategy")
+    if cat_params is None:
+        cat_params = {
+            "loss_function": 'Logloss',
+            "task_type": 'GPU',
+            "random_seed": random_state,
+            "cat_features": ["bird_id"],
+            'sampling_strategy': 0.9812617901287141,
+            'iterations': 284,
+            'depth': 5,
+            'learning_rate': 0.1065682127577123,
+            'random_strength': 78,
+            'bagging_temperature': 0.7340675314467663,
+            'od_type': 'IncToDec',
+            'od_wait': 37,
+            'l2_leaf_reg': 11
+        }
+        sampling_strategy = cat_params["sampling_strategy"]
+        cat_params.pop("sampling_strategy")
     feature_names = feature_extraction.get_feature_names()
     if verbose:
         print("features", feature_names)
-        
         
     # short audio の  k fold
     groups = candidate_df["audio_id"]
@@ -73,7 +113,6 @@ def train(
         X_train, y_train = X.loc[train_index], y.loc[train_index]
         #X_valid, y_valid = X[valid_index], y[valid_index]
         X_valid, y_valid = candidate_df_soundscapes[feature_names], candidate_df_soundscapes["target"]
-        '''
         #----------------------------------------------------------------------
         if mode=='lgbm' or mode=='cat':
             if sampling_strategy is not None:
@@ -85,17 +124,12 @@ def train(
                 # 学習用データに反映
                 X_train, y_train = ros.fit_resample(X_train, y_train)
                 print("Resampled. positive ratio: %.4f" % np.mean(y_train))
-        '''
         if mode=='lgbm':
+            print("lgb_params", lgb_params)
             dtrain = lgb.Dataset(X_train, label=y_train)
             dvalid = lgb.Dataset(X_valid, label=y_valid)
-            params = {
-                'objective': 'binary',
-                'metric': 'binary_logloss',
-                'device':'gpu',
-            }
             model = lgb.train(
-                params,
+                lgb_params,
                 dtrain,
                 valid_sets=dvalid,
                 num_boost_round=200,
@@ -106,20 +140,17 @@ def train(
             pickle.dump(model, open(f"lgbm_{kfold_index}.pkl", "wb"))
 
         elif mode=='cat':
+            print("cat_params", cat_params)
             train_pool = Pool(X_train, label=y_train, cat_features=["bird_id"])
             valid_pool = Pool(X_valid, label=y_valid, cat_features=["bird_id"])
-            model = CatBoostClassifier(
-                loss_function='Logloss',
-                task_type='GPU',
-                random_seed=random_state,    
-                cat_features=["bird_id"],
-            )
+            model = CatBoostClassifier(**cat_params)
             model.fit(train_pool, eval_set=[valid_pool], use_best_model=True, verbose=100)
             oofa+= model.predict_proba(valid_pool)[:,1]/num_kfolds
             pickle.dump(model, open(f"cat_{kfold_index}.pkl", "wb"))
 
         elif mode=='xgb':
             # 正例の重みを weight_rate, 負例を1にする
+            print("xgb_params", xgb_params)
             sample_weight = np.ones(y_train.shape)
             sample_weight[y_train==1] = weight_rate
             sample_weight_val = np.ones(y_valid.shape)
