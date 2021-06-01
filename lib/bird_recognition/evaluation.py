@@ -8,6 +8,7 @@ from pathlib import Path
 import pickle
 from typing import List
 from tqdm.notebook import tqdm
+import optuna
 
 # sound
 import librosa as lb
@@ -277,6 +278,7 @@ def optimize(
     candidate_df=candidate_df.sort_values(["row_id", "y_preda"], ascending=False).reset_index(drop=True) # groupごとに確率値を降順にソート
     print("## 0.544時の閾値をメモ")
     
+    
     for nocall_ratio in [0.64, 0.59, 0.544]:
         call_prob_df = prob_df[prob_df["birds"] != "nocall"]
         nocall_num = int(len(call_prob_df)/((1/nocall_ratio)-1))
@@ -285,98 +287,65 @@ def optimize(
         new_prob_df = pd.concat([nocall_prob_df, call_prob_df]).reset_index(drop=True)
         print("-" * 30)
         print("Nocall prob: %.4f" % (new_prob_df["birds"] == "nocall").mean(), f" call:{len(call_prob_df)}  nocall:{nocall_num}")
-        print("-" * 30)        
-        for max_bird_num in range(1, 5+1): # 最大５つの鳥まで
-            print(f"max bird num: {max_bird_num}")
-            def f(th):                
-                _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)] # 上位n件の鳥で一定確率以上のもの
-                if len(_df) == 0:
-                    return 0
-                _gdf = _df.groupby(
-                        ["audio_id", "seconds"],
-                        as_index=False
-                        )["label"].apply(
-                            lambda _: " ".join(_)
-                        ).rename(columns={
-                            "label": "predictions"
-                        })
-                submission_df = pd.merge(
-                    new_prob_df[["row_id", "audio_id", "seconds", "birds"]],
-                    _gdf,
-                    how="left",
-                    on=["audio_id", "seconds"]
-                )
-                submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
-                return submission_df.apply(
-                    lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
-                    axis=1
-                ).mean()
-
-            lb, ub = 0, 1
-            for k in range(30):
-                th1 = (lb * 2 + ub) / 3
-                th2 = (lb + ub * 2) / 3
-                if f(th1) < f(th2):
-                    lb = th1
-                else:
-                    ub = th2
-            th = (lb + ub) / 2
-            print("#Before")
-            print(" 📌best threshold: %f" % th)
-            print("  best F1: %f" % f(th))
-
-
-            # nocall injection
-            _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)]
+        print("-" * 30)
+        
+        def cal_f1(max_bird_num, th, nocall_th):
+            _df = candidate_df[((candidate_df.index%num_candidates)<max_bird_num) & (candidate_df["y_preda"] > th)] # 上位n件の鳥で一定確率以上のもの
             if len(_df) == 0:
                 return 0
             _gdf = _df.groupby(
-                        ["audio_id", "seconds"],
-                        as_index=False
-                )["label"].apply(
-                    lambda _: " ".join(_)
-                ).rename(columns={
-                    "label": "predictions"
-                })
+                    ["audio_id", "seconds"],
+                    as_index=False
+                    )["label"].apply(
+                        lambda _: " ".join(_)
+                    ).rename(columns={
+                        "label": "predictions"
+                    })
             submission_df = pd.merge(
-                        new_prob_df[["row_id", "audio_id", "seconds", "birds"]],
-                        _gdf,
-                        how="left",
-                        on=["audio_id", "seconds"]
-                    )
+                new_prob_df[["row_id", "audio_id", "seconds", "birds"]],
+                _gdf,
+                how="left",
+                on=["audio_id", "seconds"]
+            )
             submission_df.loc[submission_df["predictions"].isnull(), "predictions"] = "nocall"
+            
+            # nocall injection
             _gdf2 = _df.groupby(
-                        ["audio_id", "seconds"],
-                        as_index=False
-                )["y_preda"].sum()
+                    ["audio_id", "seconds"],
+                    as_index=False
+            )["y_preda"].sum()
             submission_df = pd.merge(
-                        submission_df,
-                        _gdf2,
-                        how="left",
-                        on=["audio_id", "seconds"]
-                    )    
-            def f_nocall(nocall_th):
-                submission_df_with_nocall = submission_df.copy()
-                submission_df_with_nocall.loc[(submission_df_with_nocall["y_preda"]<nocall_th) 
-                                                  & (submission_df_with_nocall["predictions"]!="nocall"), "predictions"] += " nocall"
-                return submission_df_with_nocall.apply(
-                        lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],
-                        axis=1
-                ).mean()
-            lb, ub = 0, 1
-            for k in range(30):
-                th1 = (lb * 2 + ub) / 3
-                th2 = (lb + ub * 2) / 3
-                if f_nocall(th1) < f_nocall(th2):
-                    lb = th1
-                else:
-                    ub = th2
-            th = (lb + ub) / 2
-            print("#After (nocall injection)")
-            print(" 📌best nocall threshold: %f" % th)
-            print("  best F1: %f" % f_nocall(th))    
-            print()    
+                    submission_df,
+                    _gdf2,
+                    how="left",
+                    on=["audio_id", "seconds"]
+                )
+            submission_df.loc[(submission_df["y_preda"]<nocall_th) 
+                                                  & (submission_df["predictions"]!="nocall"), "predictions"] += " nocall"
 
+            return submission_df.apply(
+                    lambda row: bird_recognition.metrics.get_metrics(row["birds"], row["predictions"])["f1"],axis=1).mean()
+        
+        def objective(trial):
+            max_bird_num = trial.suggest_int('max_bird_num', 1, 5)
+            th = trial.suggest_uniform('th', 0, 1)
+            nocall_th = trial.suggest_uniform('nocall_th', 0, 1)
+            
+            if nocall_th < th: #nocall injectionの意味が無いので枝刈り
+                return 0
+            
+            return cal_f1(max_bird_num, th, nocall_th)     
+            
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        study = optuna.create_study(sampler=optuna.samplers.RandomSampler(seed=777), direction='maximize')
+        study.optimize(objective, n_trials=1000)
+        print(study.best_trial)
+        print('params:', study.best_params)
+        print('nocall injection 無し')
+        print('best f1:', cal_f1(study.best_params["max_bird_num"], study.best_params["th"], nocall_th=0))
+        print('nocall injection あり')
+        print('best f1:', study.best_value)
+        
 def make_submission(
     candidate_df:pd.DataFrame,
     prob_df:pd.DataFrame,
