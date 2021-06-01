@@ -56,7 +56,8 @@ def train(
             'max_depth': 5,
             'gamma': 0.0687888272344135,
             'lambda': 1.2982042567554994,
-            'colsample_bytree': 0.6557114341349664
+            'colsample_bytree': 0.6557114341349664,
+            'seed': random_state,
         }
     if lgb_params is None:
         lgb_params = {
@@ -66,6 +67,7 @@ def train(
             'sampling_strategy': 0.7390681439478531,
             'lambda_l1': 0.03983513844141752,
             'lambda_l2': 1.8694201294820176e-06,
+            'seed': random_state,
             'num_leaves': 233,
             'feature_fraction': 0.9990617811904319,
             'bagging_fraction': 0.45709720496406336,
