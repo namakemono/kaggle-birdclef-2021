@@ -402,13 +402,14 @@ def make_submission(
             else:
                 y_preda = clf.predict_proba(X)[:,1]
             fold_y_preda_list.append(y_preda)
+            candidate_df[f"y_preda_{mode}_fold{kfold_index}"] = y_preda
         mean_preda = np.mean(fold_y_preda_list, axis=0)
         if mode=='lgbm_rank':  # スケーリング
             mean_preda = 1/(1 + np.exp(-mean_preda))
         y_preda_list.append(mean_preda)
     y_preda = np.mean(y_preda_list, axis=0)
     candidate_df["y_preda"] = y_preda
-    
+    candidate_df.to_csv("candidates.csv", index=False) 
     
     if TARGET_PATH:
         nocall_ratio = 0.544
