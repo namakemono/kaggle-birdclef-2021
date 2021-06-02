@@ -43,7 +43,7 @@ def make_candidates(
         prob_df["month"] = prob_df["date"].apply(lambda _: int(str(_)[4:6]))
         prob_df["latitude"] = prob_df["site"].apply(feature_extraction.to_latitude)
         prob_df["longitude"] = prob_df["site"].apply(feature_extraction.to_longitude)
-    
+        
     sum_prob_list = prob_df[datasets.get_bird_columns()].sum(axis=1).tolist()
     mean_prob_list = prob_df[datasets.get_bird_columns()].mean(axis=1).tolist()
     std_prob_list = prob_df[datasets.get_bird_columns()].std(axis=1).tolist()
@@ -96,7 +96,7 @@ def make_candidates(
         "month",
         "audio_id",
         "seconds",
-        "birds"
+        "birds",
     ]
     candidate_df = pd.merge(
         candidate_df,
