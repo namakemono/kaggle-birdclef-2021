@@ -6,7 +6,7 @@
 
 To overview our solution, please check here.
 
-'solutionへのリンク'
+https://www.kaggle.com/c/birdclef-2021/discussion/243304
 
 In short, our solution is composed of the three stage training.
 
