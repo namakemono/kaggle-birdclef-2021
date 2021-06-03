@@ -46,6 +46,10 @@ validation: train_soundscapes data
 
 <br>
 
+Make sure you put datasets shown below in the right directory. All of the ipynb files have been confirmed to work in the Kaggle notebook environment. (You can just imitate the same directory structure as Kaggle, like input, working.)
+
+<br>
+
 ## 1. BUILD NOCALL DETECTOR
 
 We use the nocall detector for the following two purposes.
@@ -66,10 +70,6 @@ Check the code below.
 freefield1010 data
 
 https://www.kaggle.com/startjapan/ff1010bird-duration7
-
-timm library
-
-https://www.kaggle.com/startjapan/pytorch-image-models
 
 ### [output]
 Nocall detector models are outputted.
@@ -108,7 +108,7 @@ freefield1010
 
 https://www.kaggle.com/startjapan/ff1010bird-duration7-1
 
-nocall detector output for train_short_audio
+nocall detector output for train_short_audio (See Appendix 2.)
 
 https://www.kaggle.com/startjapan/train-short-audio-nocall-fold0to4
 
@@ -143,9 +143,9 @@ https://www.kaggle.com/namakemono/birdclef-groupby-author-05221040-728258
 
 https://www.kaggle.com/kami634/clefmodel
 
-train_short_audio birdcall probabilities caliculated by melspectrogram 
+train_short_audio 397dims birdcall probabilities caliculated by melspectrogram 
 
-multilabel classifier models (Ⅰ)
+multilabel classifier models (Ⅰ) (See Appendix 3.)
 
 https://www.kaggle.com/namakemono/metadata-probability-v0525-2100
 
@@ -181,7 +181,7 @@ Check the code below.
 
 <br>
 
-## [input]
+### [input]
 
 birdclef-2021 (original data)
 
@@ -199,7 +199,7 @@ https://www.kaggle.com/kneroma/kkiller-birdclef-mels-computer-d7-part4
 
 nocall detector models
 
-## [output]
+### [output]
 
 inference results for train_short_audio are outputted.
 
