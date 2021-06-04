@@ -6,7 +6,7 @@
 
 <br>
 
-To overview our solution, please check here.
+To overview our solution, please check here...
 
 <br>
 
