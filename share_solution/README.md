@@ -14,7 +14,7 @@ https://www.kaggle.com/c/birdclef-2021/discussion/243304
 
 [Detailed version]
 
-'URL is coming soon...'
+'https://www.kaggle.com/c/birdclef-2021/discussion/243927'
 
 <br>
 
@@ -71,7 +71,7 @@ B. To attach labels to 3rd stage input data. At this time, threshold is 0.5 (har
 
 Check the code below.
 
-../working/build_nocall_detector.ipynb
+./share_solution/working/build_nocall_detector.ipynb'
 
 (This notebook is based on the following notebook by yasufuminakama@Kaggle. Please vote for his notebook as well.
 
@@ -95,7 +95,7 @@ Nocall detector models (Ⅰ) are outputted.
 
 Check the code below.
 
-'../working/build_melspectrogram_multilabel_classifier.ipynb'
+./share_solution/working/build_melspectrogram_multilabel_classifier.ipynb
 
 <br>
 
@@ -142,7 +142,7 @@ melspectrogram multilabel classifier models (Ⅱ) are outputted.
 
 Check the code below.
 
-'../working/third_stage.ipynb'
+./share_solution/working/third_stage.ipynb
 
 <br>
 
@@ -190,7 +190,7 @@ Here is a useful code by kneroma@Kaggle (maybe known as kkiller) to perform that
 
 Check the code below.
 
-../working/nocalldetect_for_train_short_audio.ipynb
+./share_solution/working/nocalldetect_for_train_short_audio.ipynb
 
 <br>
 
@@ -224,7 +224,7 @@ inference results for train_short_audio are outputted.
 
 Check the code below.
 
-../working/calculate_397dimprobs_for_train_short_audio.ipynb
+./share_solution/working/calculate_397dimprobs_for_train_short_audio.ipynb
 
 <br>
 
