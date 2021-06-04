@@ -6,16 +6,25 @@
 
 To overview our solution, please check here.
 
+<br>
+
+[Simplified version immediately after the competition]
+
 https://www.kaggle.com/c/birdclef-2021/discussion/243304
 
-In short, our solution is composed of the three stage training.
+[Detailed version]
+
+'URL is coming soon...'
+
+<br>
+
+To put it simply, our solution is composed of the three stage training.
 
 <br>
 
 ### 1st stage
 
-Making melspectrogram classifier (0:nocall, 1:somebird singing) from freefield1010 data. (hereinafter referred to as "nocall detector")
-Then calibrating 2nd stage input data by that. We make 2nd stage input labels weighted with call probablility.
+Building melspectrogram classifier (0:nocall, 1:somebird singing) from freefield1010 data. (hereinafter referred to as "nocall detector")
 
 (freefield1010 - https://academictorrents.com/details/d247b92fa7b606e0914367c0839365499dd20121)
 
@@ -23,7 +32,7 @@ Then calibrating 2nd stage input data by that. We make 2nd stage input labels we
 
 ### 2nd stage
 
-Melspectrogram multilabel classifier to identify which birds are singing in a clip(7sec).
+Building melspectrogram multilabel(397dims) classifier to identify which birds are singing in a clip(7sec). Before building it, we make 2nd stage input labels weighted with call probablility.
 
 training: train_short_audio data
 
@@ -33,8 +42,8 @@ validation: train_soundscapes data
 
 ### 3rd stage
 
-Candidate extraction from 2nd stage output (five birds extracted per clip(7sec))
-The train_metadata is added as features and then classification for each of candidates (0:unlikely 1:likely) is performed by lightgbm.
+Candidate extraction from 2nd stage output (five birds extracted per clip(7sec)).
+The train_metadata & forward/backward frame information are added as features and then classification for each of candidates (0:unlikely 1:likely) is performed by lightgbm.
 
 training: train_short_audio data
 
@@ -54,15 +63,19 @@ Make sure you put datasets shown below in the right directory. All of the ipynb 
 
 We use the nocall detector for the following two purposes.
 
-A. To calibrate 2nd stage input data. 
+A. To modify 2nd stage input data labels. 
 
-B. To attach labels to 3rd stage input data. At this time, threshold was 0.5 (hard labeling).
+B. To attach labels to 3rd stage input data. At this time, threshold is 0.5 (hard labeling).
 
 <br>
 
 Check the code below.
 
 ../working/build_nocall_detector.ipynb
+
+(This notebook is based on the following notebook by yasufuminakama@Kaggle. Please vote for his notebook as well.
+
+https://www.kaggle.com/yasufuminakama/cassava-resnext50-32x4d-starter-training)
 
 <br>
 
@@ -72,11 +85,11 @@ freefield1010 data
 https://www.kaggle.com/startjapan/ff1010bird-duration7
 
 ### [output]
-Nocall detector models are outputted.
+Nocall detector models (Ⅰ) are outputted.
 
 <br>
 
-## 2. CALIBRATE 2ND STAGE INPUT DATA & BUILD MELSPECTROGRAM MULTILABEL CLASSIFIER & USE IT FOR TRAIN_SHORT_AUDIO & TRAIN_SOUNDSCAPES
+## 2. MODIFY 2ND STAGE INPUT DATA LABELS & BUILD MELSPECTROGRAM MULTILABEL CLASSIFIER & USE IT FOR TRAIN_SHORT_AUDIO & TRAIN_SOUNDSCAPES
 
 <br>
 
@@ -119,11 +132,11 @@ https://www.kaggle.com/namakemono/scikit-learn-10dev0
 
 ### [output]
 
-melspectrogram multilabel classifier models (Ⅰ) are outputted.
+melspectrogram multilabel classifier models (Ⅱ) are outputted.
 
 <br>
 
-## 3. EXTRACT CANDIDATES & ADD FEATURES FROM TRAIN_METADATA & TRAIN LIGHTGBM & FIND A BEST THRESHOLD & MAKE SUBMISSION
+## 3. EXTRACT CANDIDATES & ADD FEATURES & TRAIN LIGHTGBM & FIND A BEST THRESHOLD & MAKE SUBMISSION
 
 <br>
 
@@ -137,15 +150,15 @@ Check the code below.
 
 birdclef-2021 (original data)
 
-melspectrogram multilabel classifier models (Ⅰ)
+melspectrogram multilabel classifier models (Ⅱ)
 
 https://www.kaggle.com/namakemono/birdclef-groupby-author-05221040-728258
 
 https://www.kaggle.com/kami634/clefmodel
 
-train_short_audio 397dims birdcall probabilities caliculated by melspectrogram 
+train_short_audio 397dims birdcall probabilities calculated by melspectrogram 
 
-multilabel classifier models (Ⅰ) (See Appendix 3.)
+multilabel classifier models (Ⅱ) (See Appendix 3.)
 
 https://www.kaggle.com/namakemono/metadata-probability-v0525-2100
 
@@ -197,7 +210,7 @@ https://www.kaggle.com/kneroma/kkiller-birdclef-mels-computer-d7-part3
 
 https://www.kaggle.com/kneroma/kkiller-birdclef-mels-computer-d7-part4
 
-nocall detector models
+nocall detector models (Ⅰ)
 
 ### [output]
 
