@@ -1,8 +1,12 @@
 # 1st Place Winning Solution - BirdCLEF 2021 - Birdcall Identification
 
-<br>
+Below is our solution for the [BirdCLEF 2021 - Birdcall Identification](https://www.kaggle.com/c/birdclef-2021/overview).
 
-### **In this directory, I would like to share the 1st place solution at Kaggle BirdCLEF 2021 competition.**
+If you want to reproduce our results, please check `share_solution/working` directory.
+
+## Overview
+
+<img src="https://user-images.githubusercontent.com/846237/120944198-2968dc00-c76e-11eb-9bb9-ec8e8d63ce53.png">
 
 <br>
 
