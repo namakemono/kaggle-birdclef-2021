@@ -58,7 +58,7 @@ Check the code below.
 - `/output`
     - Nocall detector models (Ⅰ) are outputted.
 
-## 2. Training Call Probabilities
+## 2. TRAIN CALL PROBABILITIES
 
 In this stage, we train call probabilities for each birds with no call probability on th e 1st stage.
 
