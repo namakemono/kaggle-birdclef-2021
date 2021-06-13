@@ -141,3 +141,22 @@ Check the code below.
 - `/output`
     - 397dims birdcall probabilities for train_short_audio (with some more features)
 
+<hr>
+
+## The hardware we used:
+
+- kaggle notebook
+
+- Google Colab Pro
+
+- Personally-owned PC
+    - OS : Ubuntu 18.04.3 LTS
+    - CPU : Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz
+    - Graphics : GeForce RTX 2080 Ti
+    - Memory : 64GB
+
+## Environment we used:
+
+Check the Dockerfile below. This is the same as kaggle notebook environment on 2021/6/13.
+
+[gpu.Dockerfile](./gpu.Dockerfile)
